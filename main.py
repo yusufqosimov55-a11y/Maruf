@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta
 
 # ==========================================
-# ⚙️ НАСТРОЙКИ (ВСЁ ГОТОВО)
+# ⚙️ НАСТРОЙКИ
 # ==========================================
 BOT_TOKEN = "8657040766:AAHeBxOmF86zv__MaIzayHuoOoZ5B7ycSeo"
 MARUF_ID = 934720885  
@@ -18,7 +18,6 @@ RU_DAYS = {
 
 WORKING_HOURS = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"]
 
-# Изменили имя базы данных на dent.db, чтобы обойти ошибку Render
 def init_db():
     conn = sqlite3.connect('dent.db')
     cursor = conn.cursor()
@@ -226,3 +225,42 @@ def process_name(message, date_str, hour_str):
 
 def process_phone(message, date_str, hour_str, name):
     phone = message.text
+    msg = bot.send_message(message.chat.id, "Опишите кратко вашу проблему или причину обращения:")
+    bot.register_next_step_handler(msg, process_problem, date_str, hour_str, name, phone)
+
+def process_problem(message, date_str, hour_str, name, phone):
+    problem = message.text
+    username = f"@{message.from_user.username}" if message.from_user.username else "Нет юзернейма"
+    
+    conn = sqlite3.connect('dent.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO appointments (date, time, client_name, client_phone, client_username, problem)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (date_str, hour_str, name, phone, username, problem))
+    conn.commit()
+    conn.close()
+    
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    display_date = dt.strftime("%d.%m")
+    bot.send_message(
+        message.chat.id, 
+        f"✅ Вы успешно записаны!\n📅 Дата: {display_date}\n⏰ Время: {hour_str}\n🦷 Доктор ждет вас!"
+    )
+    
+    admin_msg = (
+        f"🚨 **НОВАЯ ЗАПИСЬ НА ПРИЕМ!**\n\n"
+        f"📅 **Дата:** {display_date} в {hour_str}\n"
+        f"👤 **Пациент:** {name} ({username})\n"
+        f"📞 **Телефон:** {phone}\n"
+        f"💬 **Проблема:** {problem}"
+    )
+    bot.send_message(MARUF_ID, admin_msg, parse_mode="Markdown")
+
+# ==========================================
+# 🚀 ЗАПУСК БОТА
+# ==========================================
+if __name__ == "__main__":
+    init_db()  
+    print("Бот запущен...")
+    bot.infinity_polling(skip_pending=True)
