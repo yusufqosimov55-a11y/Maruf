@@ -2,15 +2,34 @@ import telebot
 from telebot import types
 import sqlite3
 from datetime import datetime, timedelta
+from flask import Flask
+from threading import Thread
+import time
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # ==========================================
-# ⚙️ НАСТРОЙКИ (твои данные сохранены)
+# ⚙️ НАСТРОЙКИ
 # ==========================================
 BOT_TOKEN = "8657040766:AAHeBxOmF86zv__MaIzayHuoOoZ5B7ycSeo"
 MARUF_ID = 934720885  
 # ==========================================
 
 bot = telebot.TeleBot(BOT_TOKEN)
+
+# Веб-сервер для Render (решает проблему port scan timeout)
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Dental Clinic Bot is running!"
+
+def run_web():
+    app.run(host='0.0.0.0', port=10000)
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.daemon = True
+    t.start()
 
 RU_DAYS = {
     "Mon": "Пн", "Tue": "Вт", "Wed": "Ср", "Thu": "Чт", "Fri": "Пт", "Sat": "Сб", "Sun": "Вс"
@@ -30,7 +49,9 @@ def init_db():
             client_phone TEXT,
             client_username TEXT,
             problem TEXT,
-            status TEXT DEFAULT 'active'
+            status TEXT DEFAULT 'active',
+            notified_day INTEGER DEFAULT 0,
+            notified_hour INTEGER DEFAULT 0
         )
     ''')
     cursor.execute('''
@@ -274,10 +295,56 @@ def process_problem(message, date_str, hour_str, name, phone):
     )
     bot.send_message(MARUF_ID, admin_msg, parse_mode="Markdown")
 
+# Функция проверки и отправки напоминаний
+def check_reminders():
+    conn = sqlite3.connect('dent.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, date, time, client_name, client_phone FROM appointments WHERE status = 'active'")
+    rows = cursor.fetchall()
+    
+    now = datetime.now()
+    
+    for row in rows:
+        app_id, date_str, time_str, client_name, client_phone = row
+        app_datetime = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        diff = app_datetime - now
+        
+        # Напоминание за 24 часа (плюс-минус пара минут на цикл проверки)
+        # Ищем в диапазоне от 23.5 до 24.5 часов
+        if timedelta(hours=23, minutes=30) <= diff <= timedelta(hours=24, minutes=30):
+            # Проверяем, не отправляли ли уже
+            cursor.execute("SELECT notified_day FROM appointments WHERE id = ?", (app_id,))
+            notified_day = cursor.fetchone()[0]
+            if not notified_day:
+                # Отправляем Маруфу
+                bot.send_message(MARUF_ID, f"🔔 **Напоминание:** Завтра в {time_str} прием у пациента {client_name} ({client_phone}).")
+                cursor.execute("UPDATE appointments SET notified_day = 1 WHERE id = ?", (app_id,))
+                conn.commit()
+
+        # Напоминание за 1 час (от 50 минут до 1 часа 10 минут)
+        if timedelta(minutes=50) <= diff <= timedelta(hours=1, minutes=10):
+            cursor.execute("SELECT notified_hour FROM appointments WHERE id = ?", (app_id,))
+            notified_hour = cursor.fetchone()[0]
+            if not notified_hour:
+                bot.send_message(MARUF_ID, f"⏰ **Внимание!** Через 1 час ({time_str}) прием у пациента {client_name} ({client_phone}).")
+                cursor.execute("UPDATE appointments SET notified_hour = 1 WHERE id = ?", (app_id,))
+                conn.commit()
+                
+    conn.close()
+
 # ==========================================
-# 🚀 ЗАПУСК БОТА
+# 🚀 ЗАПУСК БОТА И ПЛАНИРОВЩИКА
 # ==========================================
 if __name__ == "__main__":
     init_db()  
-    print("Бот запущен...")
+    
+    # Запуск фонового веб-сервера для Render
+    keep_alive()
+    
+    # Настройка планировщика для проверки напоминаний каждую минуту
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(check_reminders, 'interval', minutes=1)
+    scheduler.start()
+    
+    print("Бот и веб-сервер запущены...")
     bot.infinity_polling(skip_pending=True)
