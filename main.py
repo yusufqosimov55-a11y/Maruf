@@ -4,10 +4,10 @@ import sqlite3
 from datetime import datetime, timedelta
 
 # ==========================================
-# ⚙️ НАСТРОЙКИ (ВСЕ ДАННЫЕ ВШИТЫ!)
+# ⚙️ НАСТРОЙКИ (ВСЁ ГОТОВО)
 # ==========================================
 BOT_TOKEN = "8657040766:AAHeBxOmF86zv__MaIzayHuoOoZ5B7ycSeo"
-MARUF_ID = 934720885  # Твой ID для теста (потом поменяешь на ID Маруфа)
+MARUF_ID = 934720885  
 # ==========================================
 
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -18,8 +18,9 @@ RU_DAYS = {
 
 WORKING_HOURS = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"]
 
+# Изменили имя базы данных на dent.db, чтобы обойти ошибку Render
 def init_db():
-    conn = sqlite3.connect('booking.db')
+    conn = sqlite3.connect('dent.db')
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS appointments (
@@ -55,7 +56,7 @@ def get_available_dates():
     return dates
 
 def get_free_hours(date_str):
-    conn = sqlite3.connect('booking.db')
+    conn = sqlite3.connect('dent.db')
     cursor = conn.cursor()
     cursor.execute("SELECT time FROM appointments WHERE date = ? AND status = 'active'", (date_str,))
     booked_hours = [row[0] for row in cursor.fetchall()]
@@ -67,7 +68,6 @@ def get_free_hours(date_str):
     
     for hour in WORKING_HOURS:
         if hour not in booked_hours:
-            # Если выбранный день — это СЕГОДНЯ, убираем часы, которые уже прошли
             if date_str == today_str and hour <= current_time_str:
                 continue
             free_hours.append(hour)
@@ -81,9 +81,8 @@ def build_main_markup(user_id):
     btn3 = types.KeyboardButton("⭐ Оценить лечение")
     markup.add(btn1, btn2, btn3)
     
-    # Секретная кнопка только для тебя и Маруфа
-    if user_id == MARUF_ID or user_id == 8657040766: # Добавил проверку
-        btn4 = types.KeyboardButton("👨‍⚕️ Админ-панель")
+    if user_id == MARUF_ID or user_id == 8657040766:
+        btn4 = types.KeyboardButton("👨‍⚕️ Admin")
         markup.add(btn4)
     return markup
 
@@ -120,7 +119,7 @@ def handle_text(message):
         markup.add(*btn_stars)
         bot.send_message(message.chat.id, "Пожалуйста, оцените качество лечения по 5-бальной шкале:", reply_markup=markup)
 
-    elif message.text == "👨‍⚕️ Админ-панель":
+    elif message.text == "👨‍⚕️ Admin":
         if user_id == MARUF_ID or user_id == 8657040766:
             markup = types.InlineKeyboardMarkup(row_width=1)
             markup.add(
@@ -128,14 +127,12 @@ def handle_text(message):
                 types.InlineKeyboardButton(text="📆 Расписание на завтра", callback_data="admin_schedule_tomorrow"),
                 types.InlineKeyboardButton(text="🌟 Посмотреть отзывы", callback_data="admin_reviews")
             )
-            bot.send_message(message.chat.id, "🔒 Добро пожаловать в кабинет управления, Доктор Маруф! Выберите действие:", reply_markup=markup)
-        else:
-            bot.send_message(message.chat.id, "🚷 Доступ закрыт. Это меню только для доктора.")
+            bot.send_message(message.chat.id, "🔒 Добро пожаловать, Доктор Маруф! Выберите действие:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_'))
 def handle_admin_actions(call):
     action = call.data
-    conn = sqlite3.connect('booking.db')
+    conn = sqlite3.connect('dent.db')
     cursor = conn.cursor()
     
     if action == "admin_schedule_today" or action == "admin_schedule_tomorrow":
@@ -175,7 +172,7 @@ def handle_admin_actions(call):
 def handle_stars(call):
     stars = int(call.data.split('_')[1])
     bot.delete_message(call.message.chat.id, call.message.message_id)
-    msg = bot.send_message(call.message.chat.id, f"Вы поставили {stars}⭐! Напишите, пожалуйста, краткий отзыв о лечении (или отправьте /skip, чтобы пропустить):")
+    msg = bot.send_message(call.message.chat.id, f"Вы поставили {stars}⭐! Напишите краткий отзыв о лечении (или отправьте /skip):")
     bot.register_next_step_handler(msg, process_review, stars)
 
 def process_review(message, stars):
@@ -183,14 +180,14 @@ def process_review(message, stars):
     name = message.from_user.first_name or "Пациент"
     username = f"@{message.from_user.username}" if message.from_user.username else "Нет юзернейма"
     
-    conn = sqlite3.connect('booking.db')
+    conn = sqlite3.connect('dent.db')
     cursor = conn.cursor()
     cursor.execute('INSERT INTO reviews (client_name, client_username, stars, text) VALUES (?, ?, ?, ?)', 
                    (name, username, stars, review_text))
     conn.commit()
     conn.close()
     
-    bot.send_message(message.chat.id, "❤️ Спасибо огромное за ваш отзыв! Это помогает доктору Маруфу становиться ещё лучше.")
+    bot.send_message(message.chat.id, "❤️ Спасибо огромное за ваш отзыв!")
     
     stars_display = "⭐" * stars
     maruf_review_msg = (f"🌟 **НОВЫЙ ОТЗЫВ ОТ ПАЦИЕНТА!**\n\n"
@@ -205,7 +202,7 @@ def handle_date_selection(call):
     free_hours = get_free_hours(date_str)
     
     if not free_hours:
-        bot.answer_callback_query(call.id, "Извините, на этот день свободныx мест нет!")
+        bot.answer_callback_query(call.id, "Извините, на этот день свободных мест нет!")
         return
 
     markup = types.InlineKeyboardMarkup(row_width=3)
@@ -222,3 +219,10 @@ def handle_time_selection(call):
     msg = bot.send_message(call.message.chat.id, "Введите ваше Имя и Фамилию:")
     bot.register_next_step_handler(msg, process_name, date_str, hour_str)
 
+def process_name(message, date_str, hour_str):
+    name = message.text
+    msg = bot.send_message(message.chat.id, f"Приятно познакомиться, {name}! Теперь напишите ваш номер телефона:")
+    bot.register_next_step_handler(msg, process_phone, date_str, hour_str, name)
+
+def process_phone(message, date_str, hour_str, name):
+    phone = message.text
