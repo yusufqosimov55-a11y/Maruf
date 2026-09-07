@@ -4,20 +4,20 @@ import sqlite3
 from datetime import datetime, timedelta
 
 # ==========================================
-# ⚙️ НАСТРОЙКИ (ВСЁ ВСТАВЛЕНО И НАСТРОЕНО)
+# ⚙️ НАСТРОЙКИ (ВСЕ ДАННЫЕ ВШИТЫ!)
 # ==========================================
 BOT_TOKEN = "8657040766:AAHeBxOmF86zv__MaIzayHuoOoZ5B7ycSeo"
-MARUF_ID = 934720885  
+MARUF_ID = 934720885  # Твой ID для теста (потом поменяешь на ID Маруфа)
 # ==========================================
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Словарь для перевода дней недели на русский
 RU_DAYS = {
     "Mon": "Пн", "Tue": "Вт", "Wed": "Ср", "Thu": "Чт", "Fri": "Пт", "Sat": "Сб", "Sun": "Вс"
 }
 
-# База данных
+WORKING_HOURS = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"]
+
 def init_db():
     conn = sqlite3.connect('booking.db')
     cursor = conn.cursor()
@@ -45,8 +45,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-WORKING_HOURS = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"]
-
 def get_available_dates():
     dates = []
     current_date = datetime.now()
@@ -62,19 +60,42 @@ def get_free_hours(date_str):
     cursor.execute("SELECT time FROM appointments WHERE date = ? AND status = 'active'", (date_str,))
     booked_hours = [row[0] for row in cursor.fetchall()]
     conn.close()
-    return [hour for hour in WORKING_HOURS if hour not in booked_hours]
+    
+    free_hours = []
+    current_time_str = datetime.now().strftime("%H:%M")
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    for hour in WORKING_HOURS:
+        if hour not in booked_hours:
+            # Если выбранный день — это СЕГОДНЯ, убираем часы, которые уже прошли
+            if date_str == today_str and hour <= current_time_str:
+                continue
+            free_hours.append(hour)
+            
+    return free_hours
 
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
+def build_main_markup(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     btn1 = types.KeyboardButton("🦷 Записаться на прием")
     btn2 = types.KeyboardButton("ℹ️ Информация о докторе")
     btn3 = types.KeyboardButton("⭐ Оценить лечение")
     markup.add(btn1, btn2, btn3)
-    bot.send_message(message.chat.id, f"Привет! Я бот-помощник стоматолога Маруфа. Чем могу помочь?", reply_markup=markup)
+    
+    # Секретная кнопка только для тебя и Маруфа
+    if user_id == MARUF_ID or user_id == 8657040766: # Добавил проверку
+        btn4 = types.KeyboardButton("👨‍⚕️ Админ-панель")
+        markup.add(btn4)
+    return markup
+
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    markup = build_main_markup(message.from_user.id)
+    bot.send_message(message.chat.id, "Привет! Я бот-помощник стоматолога Маруфа. Чем могу помочь?", reply_markup=markup)
 
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
+    user_id = message.from_user.id
+    
     if message.text == "ℹ️ Информация о докторе":
         info = ("👨‍⚕️ **Доктор Маруф** — семейный стоматолог.\n"
                 "🦷 Услуги: Лечение, чистка, удаление, протезирование.\n"
@@ -97,7 +118,58 @@ def handle_text(message):
         markup = types.InlineKeyboardMarkup(row_width=5)
         btn_stars = [types.InlineKeyboardButton(text=f"{i}⭐", callback_data=f"stars_{i}") for i in range(1, 6)]
         markup.add(*btn_stars)
-        bot.send_message(message.chat.id, "Пожалуйста, оцените качество лечения у доктора Маруфа по 5-бальной шкале:", reply_markup=markup)
+        bot.send_message(message.chat.id, "Пожалуйста, оцените качество лечения по 5-бальной шкале:", reply_markup=markup)
+
+    elif message.text == "👨‍⚕️ Админ-панель":
+        if user_id == MARUF_ID or user_id == 8657040766:
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                types.InlineKeyboardButton(text="📋 Расписание на сегодня", callback_data="admin_schedule_today"),
+                types.InlineKeyboardButton(text="📆 Расписание на завтра", callback_data="admin_schedule_tomorrow"),
+                types.InlineKeyboardButton(text="🌟 Посмотреть отзывы", callback_data="admin_reviews")
+            )
+            bot.send_message(message.chat.id, "🔒 Добро пожаловать в кабинет управления, Доктор Маруф! Выберите действие:", reply_markup=markup)
+        else:
+            bot.send_message(message.chat.id, "🚷 Доступ закрыт. Это меню только для доктора.")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('admin_'))
+def handle_admin_actions(call):
+    action = call.data
+    conn = sqlite3.connect('booking.db')
+    cursor = conn.cursor()
+    
+    if action == "admin_schedule_today" or action == "admin_schedule_tomorrow":
+        target_date = datetime.now() if action == "admin_schedule_today" else datetime.now() + timedelta(days=1)
+        target_date_str = target_date.strftime("%Y-%m-%d")
+        display_date = target_date.strftime("%d.%m")
+        
+        cursor.execute("SELECT time, client_name, client_phone, problem FROM appointments WHERE date = ? AND status = 'active'", (target_date_str,))
+        bookings = {row[0]: (row[1], row[2], row[3]) for row in cursor.fetchall()}
+        
+        schedule_msg = f"📋 **Расписание на {display_date}:**\n\n"
+        for hour in WORKING_HOURS:
+            if hour in bookings:
+                name, phone, prob = bookings[hour]
+                schedule_msg += f"🔴 **{hour}** — Занято: {name} ({phone})\n💬 Проблема: _{prob}_\n\n"
+            else:
+                schedule_msg += f"🟢 **{hour}** — Свободно\n\n"
+                
+        bot.send_message(call.message.chat.id, schedule_msg, parse_mode="Markdown")
+        
+    elif action == "admin_reviews":
+        cursor.execute("SELECT client_name, client_username, stars, text FROM reviews ORDER BY id DESC LIMIT 10")
+        rows = cursor.fetchall()
+        if not rows:
+            bot.send_message(call.message.chat.id, "💬 Отзывов пока нет.")
+        else:
+            review_msg = "🌟 **Последние 10 отзывов от пациентов:**\n\n"
+            for row in rows:
+                stars_display = "⭐" * row[2]
+                review_msg += f"👤 **{row[0]}** ({row[1]})\n📊 Оценка: {stars_display}\n💬 Отзыв: _{row[3]}_\n───────────────\n"
+            bot.send_message(call.message.chat.id, review_msg)
+            
+    conn.close()
+    bot.answer_callback_query(call.id)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('stars_'))
 def handle_stars(call):
@@ -111,7 +183,6 @@ def process_review(message, stars):
     name = message.from_user.first_name or "Пациент"
     username = f"@{message.from_user.username}" if message.from_user.username else "Нет юзернейма"
     
-    # Сохраняем в базу отзывов
     conn = sqlite3.connect('booking.db')
     cursor = conn.cursor()
     cursor.execute('INSERT INTO reviews (client_name, client_username, stars, text) VALUES (?, ?, ?, ?)', 
@@ -121,7 +192,6 @@ def process_review(message, stars):
     
     bot.send_message(message.chat.id, "❤️ Спасибо огромное за ваш отзыв! Это помогает доктору Маруфу становиться ещё лучше.")
     
-    # Отправляем отзыв Маруфу
     stars_display = "⭐" * stars
     maruf_review_msg = (f"🌟 **НОВЫЙ ОТЗЫВ ОТ ПАЦИЕНТА!**\n\n"
                         f"👤 **От кого:** {name} ({username})\n"
@@ -135,7 +205,7 @@ def handle_date_selection(call):
     free_hours = get_free_hours(date_str)
     
     if not free_hours:
-        bot.answer_callback_query(call.id, "Извините, на этот день свободных мест нет!")
+        bot.answer_callback_query(call.id, "Извините, на этот день свободныx мест нет!")
         return
 
     markup = types.InlineKeyboardMarkup(row_width=3)
@@ -152,65 +222,3 @@ def handle_time_selection(call):
     msg = bot.send_message(call.message.chat.id, "Введите ваше Имя и Фамилию:")
     bot.register_next_step_handler(msg, process_name, date_str, hour_str)
 
-def process_name(message, date_str, hour_str):
-    name = message.text
-    msg = bot.send_message(message.chat.id, f"Приятно познакомиться, {name}! Теперь напишите ваш номер телефона:")
-    bot.register_next_step_handler(msg, process_phone, date_str, hour_str, name)
-
-def process_phone(message, date_str, hour_str, name):
-    phone = message.text
-    msg = bot.send_message(message.chat.id, "Коротко опишите вашу проблему (например: болит зуб, чистка, осмотр):")
-    bot.register_next_step_handler(msg, process_problem, date_str, hour_str, name, phone)
-
-def process_problem(message, date_str, hour_str, name, phone):
-    problem = message.text
-    username = f"@{message.from_user.username}" if message.from_user.username else "Нет юзернейма"
-    
-    conn = sqlite3.connect('booking.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO appointments (date, time, client_name, client_phone, client_username, problem)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (date_str, hour_str, name, phone, username, problem))
-    appointment_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    
-    dt = datetime.strptime(date_str, "%Y-%m-%d")
-    display_date = dt.strftime("%d.%m")
-    
-    bot.send_message(message.chat.id, f"✅ Вы успешно записаны!\n📅 Дата: {display_date}\n⏰ Время: {hour_str}\n\nДоктор Маруф ждет вас!")
-    
-    maruf_msg = (f"🆕 **НОВАЯ ЗАПИСЬ НА ПРИЕМ!**\n\n"
-                 f"📅 **Дата/Время:** {display_date} в {hour_str}\n"
-                 f"👤 **Пациент:** {name}\n"
-                 f"📞 **Телефон:** {phone}\n"
-                 f"💬 **Телеграм:** {username}\n"
-                 f"🦷 **Проблема:** {problem}")
-    
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(text="❌ Отменить эту запись", callback_data=f"cancel_{appointment_id}_{message.chat.id}"))
-    
-    bot.send_message(MARUF_ID, maruf_msg, reply_markup=markup)
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('cancel_'))
-def handle_cancel(call):
-    _, app_id, client_chat_id = call.data.split('_')
-    
-    conn = sqlite3.connect('booking.db')
-    cursor = conn.cursor()
-    cursor.execute("UPDATE appointments SET status = 'cancelled' WHERE id = ?", (app_id,))
-    conn.commit()
-    conn.close()
-    
-    bot.edit_message_text(call.message.text + "\n\n🛑 **ЗАПИСЬ ОТМЕНЕНА ДОКТОРОМ**", call.message.chat.id, call.message.message_id)
-    
-    try:
-        bot.send_message(client_chat_id, "⚠️ Извините, ваша запись к доктору Маруфу была отменена. Пожалуйста, выберите другое время через /start.")
-    except Exception:
-        pass
-
-if __name__ == '__main__':
-    init_db()
-    print("Бот успешно запущен...")
-    bot.infinity_polling()
