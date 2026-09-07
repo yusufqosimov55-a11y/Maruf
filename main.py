@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 # ⚙️ НАСТРОЙКИ (ДАННЫЕ УЖЕ ВСТАВЛЕНЫ!)
 # ==========================================
 BOT_TOKEN = "8657040766:AAHeBxOmF86zv__MaIzayHuoOoZ5B7ycSeo"
-MARUF_ID = 8657040766  
+MARUF_ID =   934720885
 # ==========================================
 
 bot = telebot.TeleBot(BOT_TOKEN)
