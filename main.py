@@ -171,3 +171,4 @@ if __name__ == '__main__':
     init_db()
     print("Бот успешно запущен...")
     bot.infinity_polling()
+
