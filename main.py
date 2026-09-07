@@ -6,6 +6,7 @@ from flask import Flask
 from threading import Thread
 import time
 from apscheduler.schedulers.background import BackgroundScheduler
+import os
 
 # ==========================================
 # ⚙️ НАСТРОЙКИ
@@ -16,7 +17,7 @@ MARUF_ID = 934720885
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Веб-сервер для Render (решает проблему port scan timeout)
+# Веб-сервер для Render (с динамическим портом, чтобы избежать port scan timeout)
 app = Flask('')
 
 @app.route('/')
@@ -24,7 +25,8 @@ def home():
     return "Dental Clinic Bot is running!"
 
 def run_web():
-    app.run(host='0.0.0.0', port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
     t = Thread(target=run_web)
@@ -295,7 +297,6 @@ def process_problem(message, date_str, hour_str, name, phone):
     )
     bot.send_message(MARUF_ID, admin_msg, parse_mode="Markdown")
 
-# Функция проверки и отправки напоминаний
 def check_reminders():
     conn = sqlite3.connect('dent.db')
     cursor = conn.cursor()
@@ -309,19 +310,14 @@ def check_reminders():
         app_datetime = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         diff = app_datetime - now
         
-        # Напоминание за 24 часа (плюс-минус пара минут на цикл проверки)
-        # Ищем в диапазоне от 23.5 до 24.5 часов
         if timedelta(hours=23, minutes=30) <= diff <= timedelta(hours=24, minutes=30):
-            # Проверяем, не отправляли ли уже
             cursor.execute("SELECT notified_day FROM appointments WHERE id = ?", (app_id,))
             notified_day = cursor.fetchone()[0]
             if not notified_day:
-                # Отправляем Маруфу
                 bot.send_message(MARUF_ID, f"🔔 **Напоминание:** Завтра в {time_str} прием у пациента {client_name} ({client_phone}).")
                 cursor.execute("UPDATE appointments SET notified_day = 1 WHERE id = ?", (app_id,))
                 conn.commit()
 
-        # Напоминание за 1 час (от 50 минут до 1 часа 10 минут)
         if timedelta(minutes=50) <= diff <= timedelta(hours=1, minutes=10):
             cursor.execute("SELECT notified_hour FROM appointments WHERE id = ?", (app_id,))
             notified_hour = cursor.fetchone()[0]
@@ -341,7 +337,7 @@ if __name__ == "__main__":
     # Запуск фонового веб-сервера для Render
     keep_alive()
     
-    # Настройка планировщика для проверки напоминаний каждую минуту
+    # Настройка планировщика
     scheduler = BackgroundScheduler()
     scheduler.add_job(check_reminders, 'interval', minutes=1)
     scheduler.start()
