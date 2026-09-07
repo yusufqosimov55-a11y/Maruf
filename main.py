@@ -4,13 +4,18 @@ import sqlite3
 from datetime import datetime, timedelta
 
 # ==========================================
-# ⚙️ НАСТРОЙКИ (ДАННЫЕ УЖЕ ВСТАВЛЕНЫ!)
+# ⚙️ НАСТРОЙКИ (ВСЁ УЖЕ НАСТРОЕНО ПО СКРИНШОТАМ!)
 # ==========================================
 BOT_TOKEN = "8657040766:AAHeBxOmF86zv__MaIzayHuoOoZ5B7ycSeo"
-MARUF_ID =   934720885
+MARUF_ID = 934720885  
 # ==========================================
 
 bot = telebot.TeleBot(BOT_TOKEN)
+
+# Словарь для перевода дней недели на русский
+RU_DAYS = {
+    "Mon": "Пн", "Tue": "Вт", "Wed": "Ср", "Thu": "Чт", "Fri": "Пт", "Sat": "Сб", "Sun": "Вс"
+}
 
 # База данных прямо внутри папки бота
 def init_db():
@@ -31,27 +36,26 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Доступные часы приема
+# Доступные часы приема Маруфа (каждые 2 часа)
 WORKING_HOURS = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"]
 
-# Генерация дат на 14 дней вперед (исключая воскресенья)
+# Генерация дат на 14 дней вперед (без воскресений)
 def get_available_dates():
     dates = []
     current_date = datetime.now()
     for i in range(14):
         next_date = current_date + timedelta(days=i)
-        if next_date.weekday() != 6:  # 6 — это воскресенье, Маруф отдыхает
+        if next_date.weekday() != 6:  # Воскресенье — выходной
             dates.append(next_date.strftime("%Y-%m-%d"))
     return dates
 
-# Поиск свободных часов на конкретную дату
+# Поиск свободных часов
 def get_free_hours(date_str):
     conn = sqlite3.connect('booking.db')
     cursor = conn.cursor()
     cursor.execute("SELECT time FROM appointments WHERE date = ? AND status = 'active'", (date_str,))
     booked_hours = [row[0] for row in cursor.fetchall()]
     conn.close()
-    
     return [hour for hour in WORKING_HOURS if hour not in booked_hours]
 
 @bot.message_handler(commands=['start'])
@@ -67,15 +71,18 @@ def handle_text(message):
     if message.text == "ℹ️ Информация о докторе":
         info = ("👨‍⚕️ **Доктор Маруф** — семейный стоматолог.\n"
                 "🦷 Услуги: Лечение, чистка, удаление, протезирование.\n"
-                "📍 Адрес: Семейная стоматологическая клиника.\n"
-                "📞 Телефон для связи напрямую: +998 (ХХ) ХХХ-ХХ-ХХ")
+                "📍 Адрес: 1-й квартал Авиасозлар, 12\n"
+                "📞 Телефон для связи напрямую: +998 (93) 533-88-59")
         bot.send_message(message.chat.id, info, parse_mode="Markdown")
         
     elif message.text == "🦷 Записаться на прием":
         dates = get_available_dates()
         markup = types.InlineKeyboardMarkup(row_width=2)
         for d in dates:
-            display_date = datetime.strptime(d, "%Y-%m-%d").strftime("%d.%m (%a)")
+            dt = datetime.strptime(d, "%Y-%m-%d")
+            eng_day = dt.strftime("%a")
+            ru_day = RU_DAYS.get(eng_day, eng_day)  # Переводим на русский
+            display_date = f"{dt.strftime('%d.%m')} ({ru_day})"
             markup.add(types.InlineKeyboardButton(text=display_date, callback_data=f"date_{d}"))
         bot.send_message(message.chat.id, "Выберите удобный день для записи:", reply_markup=markup)
 
@@ -92,7 +99,8 @@ def handle_date_selection(call):
     for hour in free_hours:
         markup.add(types.InlineKeyboardButton(text=hour, callback_data=f"time_{date_str}_{hour}"))
     
-    display_date = datetime.strptime(date_str, "%Y-%m-%d").strftime("%d.%m")
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    display_date = dt.strftime("%d.%m")
     bot.edit_message_text(f"Вы выбрали дату {display_date}. Теперь выберите свободное время:", call.message.chat.id, call.message.message_id, reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('time_'))
@@ -125,7 +133,8 @@ def process_problem(message, date_str, hour_str, name, phone):
     conn.commit()
     conn.close()
     
-    display_date = datetime.strptime(date_str, "%Y-%m-%d").strftime("%d.%m")
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    display_date = dt.strftime("%d.%m")
     
     bot.send_message(message.chat.id, f"✅ Вы успешно записаны!\n📅 Дата: {display_date}\n⏰ Время: {hour_str}\n\nДоктор Маруф ждет вас!")
     
