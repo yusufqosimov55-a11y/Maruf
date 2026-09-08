@@ -135,7 +135,6 @@ def send_location(message):
         "(1-й этаж, рядом с метро Тузель)"
     )
     
-    # ЕСЛИ ЛОКАЦИЯ НЕ ТА, ИЗМЕНИТЕ ЭТИ ДВЕ ЦИФРЫ:
     latitude = 41.295246
     longitude = 69.338661
     
@@ -406,33 +405,115 @@ def save_feedback(message):
         
     user_data.pop(chat_id, None)
 
-# --- ПАНЕЛЬ ВРАЧА И СТАТИСТИКА ---
+# --- ПАНЕЛЬ ВРАЧА (ВЫБОР ПЕРИОДА) ---
 @bot.message_handler(commands=['doctor', 'admin'])
 @bot.message_handler(func=lambda message: message.text == "📋 Панель врача")
-def doctor_panel(message):
+def doctor_panel_menu(message):
     if message.chat.id != DOCTOR_CHAT_ID:
+        return
+
+    markup = types.InlineKeyboardMarkup()
+    markup.row(
+        types.InlineKeyboardButton("📅 На сегодня", callback_data="doc_period_today"),
+        types.InlineKeyboardButton("📆 На завтра", callback_data="doc_period_tomorrow")
+    )
+    markup.row(types.InlineKeyboardButton("📊 На всю неделю", callback_data="doc_period_week"))
+
+    bot.send_message(
+        message.chat.id, 
+        "👨‍⚕️ <b>Панель врача:</b>\nВыберите период для просмотра записей:", 
+        reply_markup=markup, 
+        parse_mode="HTML"
+    )
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("doc_period_"))
+def show_doctor_period_appointments(call):
+    if call.message.chat.id != DOCTOR_CHAT_ID:
+        return
+    
+    period = call.data.replace("doc_period_", "")
+    bot.answer_callback_query(call.id)
+
+    now = datetime.now(TZ)
+    
+    if period == "today":
+        target_date_str = now.strftime("%d.%m.%Y")
+        period_title = f"📅 Записи на сегодня ({target_date_str}):"
+    elif period == "tomorrow":
+        tomorrow = now + timedelta(days=1)
+        target_date_str = tomorrow.strftime("%d.%m.%Y")
+        period_title = f"📆 Записи на завтра ({target_date_str}):"
+    elif period == "week":
+        # Считаем диапазон на 7 дней вперед
+        start_date = now.date()
+        end_date = start_date + timedelta(days=6)
+        period_title = f"📊 Записи на всю неделю (с {start_date.strftime('%d.%m')} по {end_date.strftime('%d.%m.')}):"
+    else:
         return
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, patient_name, phone_number, username, service, problem, appointment_time FROM appointments WHERE status='active' ORDER BY id ASC")
-        records = cursor.fetchall()
+        if period in ["today", "tomorrow"]:
+            cursor.execute(
+                "SELECT id, patient_name, phone_number, username, service, problem, appointment_time "
+                "FROM appointments WHERE status='active' AND appointment_time LIKE ? ORDER BY appointment_time ASC",
+                (f"{target_date_str}%",)
+            )
+        else: # неделя
+            # Выберем все активные и отфильтруем по датам в Python для надежности
+            cursor.execute(
+                "SELECT id, patient_name, phone_number, username, service, problem, appointment_time "
+                "FROM appointments WHERE status='active' ORDER BY appointment_time ASC"
+            )
+        
+        all_records = cursor.fetchall()
+
+    records = []
+    if period == "week":
+        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_dt = start_dt + timedelta(days=7)
+        for row in all_records:
+            try:
+                app_dt = datetime.strptime(row[6], "%d.%m.%Y %H:%M").replace(tzinfo=TZ)
+                if start_dt <= app_dt <= end_dt:
+                    records.append(row)
+            except ValueError:
+                continue
+    else:
+        records = all_records
 
     if not records:
-        bot.send_message(message.chat.id, "📅 Активных записей нет.", reply_markup=get_doctor_keyboard())
+        bot.edit_message_text(
+            f"{period_title}\n\n📭 Активных записей нет.",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            parse_mode="HTML"
+        )
         return
 
-    bot.send_message(message.chat.id, f"📋 Активные записи ({len(records)}):", reply_markup=get_doctor_keyboard())
+    # Удаляем меню выбора периода, чтобы вывести карточки записей
+    bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+    
+    bot.send_message(call.message.chat.id, f"<b>{period_title}</b> (Найдено: {len(records)})", parse_mode="HTML")
+    
     for app_id, name, phone, username, service, problem, app_time in records:
-        card_text = f"🆔 <b>Запись №{app_id}</b>\n👤 Пациент: {html.escape(name)}\n📞 {html.escape(phone)}\n⏰ {app_time}\n🩺 {html.escape(service)}: {html.escape(problem)}"
+        card_text = (
+            f"🆔 <b>Запись №{app_id}</b>\n"
+            f"👤 Пациент: {html.escape(name)}\n"
+            f"📞 Телефон: {html.escape(phone)}\n"
+            f"⏰ Время: {app_time}\n"
+            f"🩺 Услуга: {html.escape(service)}\n"
+            f"💬 Жалоба: {html.escape(problem)}"
+        )
         
         markup = types.InlineKeyboardMarkup()
         markup.row(
             types.InlineKeyboardButton("✅ Пришёл", callback_data=f"status_completed_{app_id}"),
             types.InlineKeyboardButton("❌ Не пришёл", callback_data=f"status_noshow_{app_id}")
         )
-        markup.row(types.InlineKeyboardButton("❌ Отменить", callback_data=f"cancel_{app_id}"))
-        bot.send_message(message.chat.id, card_text, reply_markup=markup, parse_mode="HTML")
+        markup.row(types.InlineKeyboardButton("❌ Отменить запись", callback_data=f"cancel_{app_id}"))
+        
+        bot.send_message(call.message.chat.id, card_text, reply_markup=markup, parse_mode="HTML")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('status_'))
 def handle_status_change(call):
@@ -448,7 +529,6 @@ def handle_status_change(call):
     bot.answer_callback_query(call.id, "Статус обновлен!")
     status_text = "✅ Отмечено: Пришёл" if status == "completed" else "❌ Отмечено: Не пришёл"
     
-    # Чтобы не падало при редактировании, убираем старый текст сообщения и оставляем только статус
     bot.edit_message_text(f"Запись №{app_id}\n\n<b>{status_text}</b>", chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode="HTML")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cancel_'))
