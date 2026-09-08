@@ -50,16 +50,16 @@ def init_db():
 
 # --- КЛАВИАТУРЫ (КНОПКИ МЕНЮ) ---
 
-# Главное меню для клиентов (Закрепленное постоянное меню)
+# Главное меню для клиентов (Исправлен параметр на is_persistent)
 def get_main_keyboard():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, persistent=True)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
     markup.row("📅 Записаться на приём", "🩺 Услуги и лечение")
     markup.row("⭐ Оценить лечение / Отзыв", "ℹ️ Информация")
     return markup
 
 # Меню для доктора
 def get_doctor_keyboard():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, persistent=True)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
     markup.row("📋 Панель врача", "📊 Все записи")
     markup.row("📱 Главное меню клиента")
     return markup
@@ -355,5 +355,5 @@ if __name__ == '__main__':
     scheduler.add_job(check_and_send_reminders, 'interval', minutes=30)
     scheduler.start()
 
-    print("Бот запущен с принудительным меню!")
+    print("Бот запущен с исправленной клавиатурой!")
     bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
