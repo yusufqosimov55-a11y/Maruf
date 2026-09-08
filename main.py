@@ -8,7 +8,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8657040766:AAHeBxOmF86zv__MaIzayHuoOoZ5B7ycSeo")
-# Приводим ID к числу для надёжности сравнения
 DOCTOR_CHAT_ID = int(os.getenv("DOCTOR_CHAT_ID", "934720885"))
 
 bot = TeleBot(BOT_TOKEN)
@@ -51,16 +50,16 @@ def init_db():
 
 # --- КЛАВИАТУРЫ (КНОПКИ МЕНЮ) ---
 
-# Главное меню для клиентов на экране телефона
+# Главное меню для клиентов (Закрепленное постоянное меню)
 def get_main_keyboard():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, persistent=True)
     markup.row("📅 Записаться на приём", "🩺 Услуги и лечение")
     markup.row("⭐ Оценить лечение / Отзыв", "ℹ️ Информация")
     return markup
 
 # Меню для доктора
 def get_doctor_keyboard():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, persistent=True)
     markup.row("📋 Панель врача", "📊 Все записи")
     markup.row("📱 Главное меню клиента")
     return markup
@@ -70,19 +69,17 @@ def get_doctor_keyboard():
 def start_cmd(message):
     chat_id = message.chat.id
     
-    # Если зашел доктор
     if chat_id == DOCTOR_CHAT_ID:
         bot.send_message(
             chat_id,
-            "Здравствуйте, доктор Маруф! Включена панель администратора.",
+            "Здравствуйте, доктор Маруф! Панель администратора готова.",
             reply_markup=get_doctor_keyboard()
         )
         return
 
-    # Если зашел обычный клиент
     welcome_text = (
         "Здравствуйте! Вас приветствует бот стоматологической клиники доктора Маруфа. 🦷\n\n"
-        "Воспользуйтесь кнопками меню ниже для записи на приём или получения информации."
+        "Используйте меню ниже для записи или получения информации."
     )
     bot.send_message(chat_id, welcome_text, reply_markup=get_main_keyboard())
 
@@ -99,7 +96,7 @@ def start_booking_button(message):
 @bot.message_handler(func=lambda message: message.text == "🩺 Услуги и лечение")
 def services_info(message):
     text = (
-        "🏥 **Услуги клиники доктора Маруфа:**\n\n"
+        "🏥 Услуги клиники доктора Маруфа:\n\n"
         "• Лечение кариеса и пульпита\n"
         "• Профессиональная гигиена и чистка\n"
         "• Протезирование и установка коронок\n"
@@ -112,22 +109,21 @@ def services_info(message):
 @bot.message_handler(func=lambda message: message.text == "ℹ️ Информация")
 def clinic_info(message):
     text = (
-        "📍 **Клиника доктора Маруфа**\n\n"
-        "⏰ **Режим работы:** Пн-Сб с 09:00 до 19:00\n"
-        "📞 **Телефон для связи:** +998 (90) 123-45-67\n"
+        "📍 Клиника доктора Маруфа\n\n"
+        "⏰ Режим работы: Пн-Сб с 09:00 до 19:00\n"
+        "📞 Телефон для связи: +998 (90) 123-45-67\n\n"
         "Заботьтесь о своей улыбке вовремя!"
     )
     bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard())
 
 @bot.message_handler(func=lambda message: message.text == "⭐ Оценить лечение / Отзыв")
 def ask_feedback(message):
-    msg = bot.send_message(message.chat.id, "Напишите ваш отзыв или оценку работы клиники:")
+    msg = bot.send_message(message.chat.id, "Напишите ваш отзыв или оценку работы клиники:", reply_markup=get_main_keyboard())
     bot.register_next_step_handler(msg, save_feedback)
 
 def save_feedback(message):
     bot.send_message(message.chat.id, "Спасибо за ваш отзыв! Мы ценим ваше мнение. ❤️", reply_markup=get_main_keyboard())
-    # Пересылка отзыва врачу
-    review_msg = f"🌟 **НОВЫЙ ОТЗЫВ!**\n\nОт: {message.from_user.first_name} (@{message.from_user.username or 'без_юзернейма'})\nТекст: {message.text}"
+    review_msg = f"🌟 НОВЫЙ ОТЗЫВ!\n\nОт: {message.from_user.first_name} (@{message.from_user.username or 'без_юзернейма'})\nТекст: {message.text}"
     bot.send_message(DOCTOR_CHAT_ID, review_msg)
 
 # --- ПРОЦЕСС ЗАПИСИ НА ПРИЕМ ---
@@ -178,7 +174,7 @@ def ask_name(call):
         user_data[chat_id] = {}
     user_data[chat_id]["time"] = selected_time
 
-    msg = bot.send_message(chat_id, "Введите ваше ФИО (Имя и Фамилию):")
+    msg = bot.send_message(chat_id, "Введите ваше ФИО (Имя и Фамилию):", reply_markup=get_main_keyboard())
     bot.register_next_step_handler(msg, process_name)
 
 def process_name(message):
@@ -230,7 +226,7 @@ def process_problem(message):
         reply_markup=get_main_keyboard()
     )
 
-    # Уведомление врачу с кнопками отмены и связи
+    # Уведомление врачу
     user_link = f"@{message.from_user.username}" if message.from_user.username else "Не указан"
     doctor_msg = (
         f"🆕 НОВАЯ ЗАПИСЬ №{app_id}!\n\n"
@@ -248,13 +244,13 @@ def process_problem(message):
 
     bot.send_message(DOCTOR_CHAT_ID, doctor_msg, reply_markup=markup)
 
-# --- ПАНЕЛЬ ВРАЧАИ УПРАВЛЕНИЕ ЗАПИСЯМИ ---
+# --- ПАНЕЛЬ ВРАЧА ---
 
 @bot.message_handler(commands=['doctor', 'admin'])
 @bot.message_handler(func=lambda message: message.text in ["📋 Панель врача", "📊 Все записи"])
 def doctor_panel(message):
     if message.chat.id != DOCTOR_CHAT_ID:
-        bot.send_message(message.chat.id, "⛔ Доступ запрещён.")
+        bot.send_message(message.chat.id, "⛔ Доступ запрещён.", reply_markup=get_main_keyboard())
         return
 
     conn = sqlite3.connect('dentistry.db')
@@ -290,7 +286,7 @@ def doctor_panel(message):
 
         bot.send_message(message.chat.id, card_text, reply_markup=markup)
 
-# Отмена записи админом
+# Отмена записи
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cancel_'))
 def handle_cancel_appointment(call):
     if call.message.chat.id != DOCTOR_CHAT_ID:
@@ -308,13 +304,13 @@ def handle_cancel_appointment(call):
         cursor.execute("UPDATE appointments SET status='cancelled' WHERE id=?", (app_id,))
         conn.commit()
 
-        # Уведомление клиенту
         try:
             bot.send_message(
                 user_id,
                 f"⚠️ Здравствуйте, {patient_name}!\n\n"
-                f"Ваша запись к доктору Маруфу на {app_time} была отменена клиникой.\n"
-                f"Для выбора другого времени воспользуйтесь кнопкой «Записаться на приём»."
+                f"Ваша запись к доктору Маруфу на {app_time} была отменена.\n"
+                f"Для выбора другого времени воспользуйтесь меню ниже.",
+                reply_markup=get_main_keyboard()
             )
         except Exception:
             pass
@@ -342,7 +338,8 @@ def check_and_send_reminders():
             if timedelta(hours=0) <= (app_dt - now) <= timedelta(hours=2):
                 bot.send_message(
                     user_id,
-                    f"⏰ Здравствуйте, {name}!\nНапоминаем о вашем визите к доктору Маруфу сегодня в {app_dt.strftime('%H:%M')}."
+                    f"⏰ Здравствуйте, {name}!\nНапоминаем о вашем визите к доктору Маруфу сегодня в {app_dt.strftime('%H:%M')}.",
+                    reply_markup=get_main_keyboard()
                 )
         except ValueError:
             continue
@@ -358,5 +355,5 @@ if __name__ == '__main__':
     scheduler.add_job(check_and_send_reminders, 'interval', minutes=30)
     scheduler.start()
 
-    print("Бот полностью запущен!")
+    print("Бот запущен с принудительным меню!")
     bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
