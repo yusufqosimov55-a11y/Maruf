@@ -126,10 +126,9 @@ def clinic_info(message):
 def send_location(message):
     chat_id = message.chat.id
     bot.send_message(chat_id, "📍 Клиника находится по адресу: 1-й квартал Авиасозлар, 12")
-    # Координаты Ташкента (пример)
     bot.send_location(chat_id, latitude=41.2995, longitude=69.2401)
 
-# --- ПРОЦЕСС ЗАПИСИ (С ВЫБОРОМ УСЛУГИ И ПОДТВЕРЖДЕНИЕМ) ---
+# --- ПРОЦЕСС ЗАПИСИ ---
 @bot.message_handler(func=lambda message: message.text in ["📅 Записаться на приём", "/book"])
 def start_booking_button(message):
     markup = types.InlineKeyboardMarkup()
@@ -276,7 +275,6 @@ def finalize_booking(call):
 
     app_time_str = f"{data['date']} {data['time']}"
 
-    # Проверка повторного бронирования
     if data['time'] in get_booked_times(data['date']):
         bot.send_message(chat_id, "⚠️ Извините, это время только что заняли! Выберите другое время.", reply_markup=get_main_keyboard())
         return
@@ -298,7 +296,6 @@ def finalize_booking(call):
         message_id=call.message.message_id
     )
 
-    # Уведомление доктору
     user_link = f"@{call.from_user.username}" if call.from_user.username else "Не указан"
     doctor_msg = (
         f"🆕 **НОВАЯ ЗАПИСЬ №{app_id}!**\n\n"
@@ -467,7 +464,7 @@ def show_statistics(message):
     )
     bot.send_message(message.chat.id, stats_text, parse_mode="Markdown")
 
-# --- ДВУХУРОВНЕВЫЕ НАПОМИНАНИЯ (ЗА 24Ч И ЗА 2Ч) ---
+# --- ДВУХУРОВНЕВЫЕ НАПОМИНАНИЯ (ИСПРАВЛЕННАЯ СТРОКА 479) ---
 def check_and_send_reminders():
     now = datetime.now(TZ)
     
@@ -476,7 +473,7 @@ def check_and_send_reminders():
         cursor.execute("SELECT id, user_id, patient_name, appointment_time, reminded_24h, reminded_2h FROM appointments WHERE status='active'")
         records = cursor.fetchall()
 
-        for app_id, user_id, name, app_time_str, r24, r2:
+        for app_id, user_id, name, app_time_str, r24, r2 in records:
             try:
                 app_dt = datetime.strptime(app_time_str, "%d.%m.%Y %H:%M").replace(tzinfo=TZ)
                 diff = app_dt - now
@@ -506,3 +503,4 @@ if __name__ == '__main__':
 
     print("Бот успешно запущен!")
     bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
+
