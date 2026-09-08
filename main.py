@@ -13,7 +13,7 @@ DOCTOR_CHAT_ID = int(os.getenv("DOCTOR_CHAT_ID", "934720885"))
 bot = TeleBot(BOT_TOKEN)
 app = Flask('')
 
-# Временное хранилище шагов записи клиентов
+# Временное хранилище данных пользователей (запись и отзывы)
 user_data = {}
 
 # --- FLASK ДЛЯ UPTIMEROBOT ---
@@ -50,14 +50,12 @@ def init_db():
 
 # --- КЛАВИАТУРЫ (КНОПКИ МЕНЮ) ---
 
-# Главное меню для клиентов (Исправлен параметр на is_persistent)
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
     markup.row("📅 Записаться на приём", "🩺 Услуги и лечение")
     markup.row("⭐ Оценить лечение / Отзыв", "ℹ️ Информация")
     return markup
 
-# Меню для доктора
 def get_doctor_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
     markup.row("📋 Панель врача", "📊 Все записи")
@@ -116,14 +114,59 @@ def clinic_info(message):
     )
     bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard())
 
+# --- ОЦЕНКА И ОТЗЫВЫ (С КНОПКАМИ 1-5 ЗВЁЗД) ---
+
 @bot.message_handler(func=lambda message: message.text == "⭐ Оценить лечение / Отзыв")
-def ask_feedback(message):
-    msg = bot.send_message(message.chat.id, "Напишите ваш отзыв или оценку работы клиники:", reply_markup=get_main_keyboard())
+def ask_rating(message):
+    markup = types.InlineKeyboardMarkup()
+    buttons = [
+        types.InlineKeyboardButton("⭐ 1", callback_data="rate_1"),
+        types.InlineKeyboardButton("⭐⭐ 2", callback_data="rate_2"),
+        types.InlineKeyboardButton("⭐⭐⭐ 3", callback_data="rate_3"),
+        types.InlineKeyboardButton("⭐⭐⭐⭐ 4", callback_data="rate_4"),
+        types.InlineKeyboardButton("⭐⭐⭐⭐⭐ 5", callback_data="rate_5")
+    ]
+    markup.row(buttons[0], buttons[1], buttons[2])
+    markup.row(buttons[3], buttons[4])
+
+    bot.send_message(
+        message.chat.id,
+        "Пожалуйста, оцените качество нашего лечения и обслуживания:",
+        reply_markup=markup
+    )
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("rate_"))
+def process_rating(call):
+    stars = call.data.split("_")[1]
+    rating_stars = "⭐" * int(stars)
+    
+    chat_id = call.message.chat.id
+    if chat_id not in user_data:
+        user_data[chat_id] = {}
+    
+    user_data[chat_id]["rating"] = rating_stars
+
+    bot.answer_callback_query(call.id)
+    msg = bot.send_message(
+        chat_id,
+        f"Вы поставили оценку: {rating_stars}\n\nТеперь напишите ваш комментарий или отзыв текстом:",
+        reply_markup=get_main_keyboard()
+    )
     bot.register_next_step_handler(msg, save_feedback)
 
 def save_feedback(message):
-    bot.send_message(message.chat.id, "Спасибо за ваш отзыв! Мы ценим ваше мнение. ❤️", reply_markup=get_main_keyboard())
-    review_msg = f"🌟 НОВЫЙ ОТЗЫВ!\n\nОт: {message.from_user.first_name} (@{message.from_user.username or 'без_юзернейма'})\nТекст: {message.text}"
+    chat_id = message.chat.id
+    rating = user_data.get(chat_id, {}).get("rating", "Без оценки")
+    feedback_text = message.text
+
+    bot.send_message(chat_id, "Спасибо за ваш отзыв! Мы ценим ваше мнение. ❤️", reply_markup=get_main_keyboard())
+    
+    review_msg = (
+        f"🌟 НОВЫЙ ОТЗЫВ!\n\n"
+        f"👤 От: {message.from_user.first_name} (@{message.from_user.username or 'без_юзернейма'})\n"
+        f"⭐ Оценка: {rating}\n"
+        f"💬 Текст: {feedback_text}"
+    )
     bot.send_message(DOCTOR_CHAT_ID, review_msg)
 
 # --- ПРОЦЕСС ЗАПИСИ НА ПРИЕМ ---
@@ -226,7 +269,6 @@ def process_problem(message):
         reply_markup=get_main_keyboard()
     )
 
-    # Уведомление врачу
     user_link = f"@{message.from_user.username}" if message.from_user.username else "Не указан"
     doctor_msg = (
         f"🆕 НОВАЯ ЗАПИСЬ №{app_id}!\n\n"
@@ -286,7 +328,6 @@ def doctor_panel(message):
 
         bot.send_message(message.chat.id, card_text, reply_markup=markup)
 
-# Отмена записи
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cancel_'))
 def handle_cancel_appointment(call):
     if call.message.chat.id != DOCTOR_CHAT_ID:
@@ -355,5 +396,5 @@ if __name__ == '__main__':
     scheduler.add_job(check_and_send_reminders, 'interval', minutes=30)
     scheduler.start()
 
-    print("Бот запущен с исправленной клавиатурой!")
+    print("Бот запущен с кнопками рейтинга!")
     bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
