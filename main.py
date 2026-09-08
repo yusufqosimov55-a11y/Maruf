@@ -101,7 +101,7 @@ def show_client_menu(message):
 @bot.message_handler(func=lambda message: message.text in ["🩺 Услуги и лечение"])
 def services_info(message):
     text = (
-        "🏥 **Услуги клиники доктора Маруфа:**\n\n"
+        "🏥 **Услуги клиники Stoma dent:**\n\n"
         "• Лечение кариеса и пульпита\n"
         "• Профессиональная гигиена и чистка\n"
         "• Протезирование и установка коронок\n"
@@ -114,19 +114,31 @@ def services_info(message):
 @bot.message_handler(func=lambda message: message.text == "ℹ️ Информация")
 def clinic_info(message):
     text = (
-        "👨‍⚕️ Стоматологическая клиника доктора Маруфа\n\n"
-        "📍 Адрес: 1-й квартал Авиасозлар, 12\n"
+        "👨‍⚕️ Стоматологическая клиника Stoma dent (доктор Маруф)\n\n"
+        "📍 Адрес: г. Ташкент, Яшнабадский район, 1-й квартал Авиасозлар, 12\n"
+        "🚇 Ориентир: метро Тузель\n"
         "⏰ Режим работы: Пн-Сб с 09:00 до 18:00 (Вс - выходной)\n"
-        "📞 Телефон для связи: +998 (90) 123-45-67\n\n"
+        "📞 Телефон для связи: +998 (93) 508-11-88\n\n"
         "Заботьтесь о своей улыбке вовремя!"
     )
     bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard())
 
+# --- ТОЧНАЯ ГЕОЛОКАЦИЯ ИЗ 2ГИС ---
 @bot.message_handler(func=lambda message: message.text == "📍 Как нас найти")
 def send_location(message):
     chat_id = message.chat.id
-    bot.send_message(chat_id, "📍 Клиника находится по адресу: 1-й квартал Авиасозлар, 12")
-    bot.send_location(chat_id, latitude=41.2995, longitude=69.2401)
+    bot.send_message(
+        chat_id, 
+        "📍 Наша клиника Stoma dent находится по адресу:\n"
+        "г. Ташкент, Яшнабадский район, 1-й квартал Авиасозлар, 12\n"
+        "(Ориентир: станция метро Тузель)"
+    )
+    
+    # Координаты Stoma dent из 2ГИС:
+    latitude = 41.295076
+    longitude = 69.337597
+    
+    bot.send_location(chat_id, latitude=latitude, longitude=longitude)
 
 # --- ПРОЦЕСС ЗАПИСИ ---
 @bot.message_handler(func=lambda message: message.text in ["📅 Записаться на приём", "/book"])
@@ -464,7 +476,7 @@ def show_statistics(message):
     )
     bot.send_message(message.chat.id, stats_text, parse_mode="Markdown")
 
-# --- ДВУХУРОВНЕВЫЕ НАПОМИНАНИЯ (ИСПРАВЛЕННАЯ СТРОКА 479) ---
+# --- ДВУХУРОВНЕВЫЕ НАПОМИНАНИЯ ---
 def check_and_send_reminders():
     now = datetime.now(TZ)
     
@@ -480,12 +492,12 @@ def check_and_send_reminders():
 
                 # Напоминание за 24 часа
                 if timedelta(hours=23) <= diff <= timedelta(hours=25) and not r24:
-                    bot.send_message(user_id, f"🦷 Напоминаем: у вас завтра визит к доктору Маруфу в {app_dt.strftime('%H:%M')}.")
+                    bot.send_message(user_id, f"🦷 Напоминаем: у вас завтра визит в клинику Stoma dent в {app_dt.strftime('%H:%M')}.")
                     cursor.execute("UPDATE appointments SET reminded_24h = 1 WHERE id = ?", (app_id,))
 
                 # Напоминание за 2 часа
                 elif timedelta(minutes=105) <= diff <= timedelta(minutes=135) and not r2:
-                    bot.send_message(user_id, f"⏰ Напоминание: ваш визит к доктору Маруфу через 2 часа ({app_dt.strftime('%H:%M')}). Ждем вас!")
+                    bot.send_message(user_id, f"⏰ Напоминание: ваш визит в клинику Stoma dent через 2 часа ({app_dt.strftime('%H:%M')}). Ждем вас!")
                     cursor.execute("UPDATE appointments SET reminded_2h = 1 WHERE id = ?", (app_id,))
 
             except ValueError:
@@ -503,4 +515,3 @@ if __name__ == '__main__':
 
     print("Бот успешно запущен!")
     bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
-
