@@ -7,8 +7,8 @@ from telebot import TeleBot, types
 from apscheduler.schedulers.background import BackgroundScheduler
 
 # --- НАСТРОЙКИ ---
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
-DOCTOR_CHAT_ID = os.getenv("DOCTOR_CHAT_ID", "YOUR_TELEGRAM_CHAT_ID")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8657040766:AAHeBxOmF86zv__MaIzayHuoOoZ5B7ycSeo")
+DOCTOR_CHAT_ID = os.getenv("7921140639", "934720885")
 
 bot = TeleBot(BOT_TOKEN)
 app = Flask('')
