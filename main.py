@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import html
 from datetime import datetime, timedelta
 from threading import Thread
 from zoneinfo import ZoneInfo
@@ -85,7 +86,7 @@ def get_doctor_keyboard():
 def start_cmd(message):
     chat_id = message.chat.id
     if chat_id == DOCTOR_CHAT_ID:
-        bot.send_message(chat_id, "Здравствуйте, доктор Маруф! Панель администратора готова.", reply_markup=get_doctor_keyboard())
+        bot.send_message(chat_id, "👨‍⚕️ Здравствуйте, доктор Маруф! Панель врача готова.", reply_markup=get_doctor_keyboard())
         return
 
     welcome_text = (
@@ -101,7 +102,7 @@ def show_client_menu(message):
 @bot.message_handler(func=lambda message: message.text in ["🩺 Услуги и лечение"])
 def services_info(message):
     text = (
-        "🏥 **Услуги клиники Stoma dent:**\n\n"
+        "🏥 <b>Услуги клиники Stoma dent:</b>\n\n"
         "• Лечение кариеса и пульпита\n"
         "• Профессиональная гигиена и чистка\n"
         "• Протезирование и установка коронок\n"
@@ -109,7 +110,7 @@ def services_info(message):
         "• Эстетическая стоматология и отбеливание\n\n"
         "Нажмите «📅 Записаться на приём», чтобы выбрать удобное время!"
     )
-    bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
+    bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard(), parse_mode="HTML")
 
 @bot.message_handler(func=lambda message: message.text == "ℹ️ Информация")
 def clinic_info(message):
@@ -123,7 +124,7 @@ def clinic_info(message):
     )
     bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard())
 
-# --- ТОЧНАЯ ГЕОЛОКАЦИЯ АВИАСОЗЛАР 1, ДОМ 12 ---
+# --- ТОЧНАЯ ГЕОЛОКАЦИЯ ---
 @bot.message_handler(func=lambda message: message.text == "📍 Как нас найти")
 def send_location(message):
     chat_id = message.chat.id
@@ -134,7 +135,7 @@ def send_location(message):
         "(1-й этаж, рядом с метро Тузель)"
     )
     
-    # Координаты точно по зданию Авиасозлар-1, 12:
+    # ЕСЛИ ЛОКАЦИЯ НЕ ТА, ИЗМЕНИТЕ ЭТИ ДВЕ ЦИФРЫ:
     latitude = 41.295246
     longitude = 69.338661
     
@@ -169,7 +170,7 @@ def start_date_selection(chat_id):
 
     while days_added < 5:
         current_day += timedelta(days=1)
-        if current_day.weekday() == 6:  # Пропуск воскресенья
+        if current_day.weekday() == 6:
             continue
         
         days_ru = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -253,13 +254,13 @@ def process_problem(message):
     data = user_data[chat_id]
 
     text = (
-        "📋 **ПРОВЕРЬТЕ ДАННЫЕ:**\n\n"
-        f"👤 Имя: {data.get('name')}\n"
-        f"📞 Телефон: {data.get('phone')}\n"
+        "📋 <b>ПРОВЕРЬТЕ ДАННЫЕ:</b>\n\n"
+        f"👤 Имя: {html.escape(data.get('name', ''))}\n"
+        f"📞 Телефон: {html.escape(data.get('phone', ''))}\n"
         f"📅 Дата: {data.get('date')}\n"
         f"⏰ Время: {data.get('time')}\n"
-        f"🦷 Услуга: {data.get('service', 'Консультация')}\n"
-        f"💬 Жалоба: {data.get('problem')}\n\n"
+        f"🦷 Услуга: {html.escape(data.get('service', 'Консультация'))}\n"
+        f"💬 Жалоба: {html.escape(data.get('problem', ''))}\n\n"
         "Всё верно?"
     )
 
@@ -268,7 +269,7 @@ def process_problem(message):
         types.InlineKeyboardButton("✅ Подтвердить", callback_data="confirm_booking"),
         types.InlineKeyboardButton("❌ Отменить", callback_data="cancel_booking_process")
     )
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="HTML")
 
 @bot.callback_query_handler(func=lambda call: call.data in ["confirm_booking", "cancel_booking_process"])
 def finalize_booking(call):
@@ -300,8 +301,6 @@ def finalize_booking(call):
         app_id = cursor.lastrowid
         conn.commit()
 
-    user_data.pop(chat_id, None)
-
     bot.edit_message_text(
         f"✅ Вы успешно записаны!\n\n👤 Имя: {data['name']}\n📅 Дата и время: {app_time_str}\n🩺 Услуга: {data.get('service')}\n\nМы ждём вас!",
         chat_id=chat_id,
@@ -310,10 +309,13 @@ def finalize_booking(call):
 
     user_link = f"@{call.from_user.username}" if call.from_user.username else "Не указан"
     doctor_msg = (
-        f"🆕 **НОВАЯ ЗАПИСЬ №{app_id}!**\n\n"
-        f"👤 Пациент: {data['name']}\n📞 Телефон: {data['phone']}\n"
-        f"💬 Telegram: {user_link}\n⏰ Время: {app_time_str}\n"
-        f"🦷 Услуга: {data.get('service')}\n🩺 Жалоба: {data['problem']}"
+        f"🆕 <b>НОВАЯ ЗАПИСЬ №{app_id}!</b>\n\n"
+        f"👤 Пациент: {html.escape(data['name'])}\n"
+        f"📞 Телефон: {html.escape(data['phone'])}\n"
+        f"💬 Telegram: {user_link}\n"
+        f"⏰ Время: {app_time_str}\n"
+        f"🦷 Услуга: {html.escape(data.get('service', 'Консультация'))}\n"
+        f"🩺 Жалоба: {html.escape(data['problem'])}"
     )
     
     markup = types.InlineKeyboardMarkup()
@@ -321,7 +323,12 @@ def finalize_booking(call):
         markup.add(types.InlineKeyboardButton("💬 Написать клиенту", url=f"https://t.me/{call.from_user.username}"))
     markup.add(types.InlineKeyboardButton("❌ Отменить запись", callback_data=f"cancel_{app_id}"))
 
-    bot.send_message(DOCTOR_CHAT_ID, doctor_msg, reply_markup=markup, parse_mode="Markdown")
+    try:
+        bot.send_message(DOCTOR_CHAT_ID, doctor_msg, reply_markup=markup, parse_mode="HTML")
+    except Exception as e:
+        print(f"Ошибка отправки врачу: {e}")
+
+    user_data.pop(chat_id, None)
 
 # --- МОИ ЗАПИСИ (КЛИЕНТ) ---
 @bot.message_handler(func=lambda message: message.text == "📋 Мои записи")
@@ -339,7 +346,7 @@ def show_my_appointments(message):
         bot.send_message(chat_id, "У вас нет активных записей.")
         return
 
-    bot.send_message(chat_id, "📋 **Ваши активные записи:**", parse_mode="Markdown")
+    bot.send_message(chat_id, "📋 <b>Ваши активные записи:</b>", parse_mode="HTML")
     for app_id, app_time, service in records:
         text = f"🗓 Дата: {app_time}\n🦷 Услуга: {service}\n👨‍⚕️ Доктор Маруф"
         markup = types.InlineKeyboardMarkup()
@@ -384,8 +391,20 @@ def save_feedback(message):
     feedback_text = message.text
 
     bot.send_message(chat_id, "Спасибо за ваш отзыв! ❤️", reply_markup=get_main_keyboard())
-    review_msg = f"🌟 **НОВЫЙ ОТЗЫВ!**\n\n👤 От: {message.from_user.first_name} (@{message.from_user.username or 'нет'})\n⭐ Оценка: {rating}\n💬 Текст: {feedback_text}"
-    bot.send_message(DOCTOR_CHAT_ID, review_msg, parse_mode="Markdown")
+    
+    review_msg = (
+        f"🌟 <b>НОВЫЙ ОТЗЫВ!</b>\n\n"
+        f"👤 От: {html.escape(message.from_user.first_name)} (@{message.from_user.username or 'нет'})\n"
+        f"⭐ Оценка: {rating}\n"
+        f"💬 Текст: {html.escape(feedback_text)}"
+    )
+    
+    try:
+        bot.send_message(DOCTOR_CHAT_ID, review_msg, parse_mode="HTML")
+    except Exception as e:
+        print(f"Ошибка отправки отзыва врачу: {e}")
+        
+    user_data.pop(chat_id, None)
 
 # --- ПАНЕЛЬ ВРАЧА И СТАТИСТИКА ---
 @bot.message_handler(commands=['doctor', 'admin'])
@@ -405,7 +424,7 @@ def doctor_panel(message):
 
     bot.send_message(message.chat.id, f"📋 Активные записи ({len(records)}):", reply_markup=get_doctor_keyboard())
     for app_id, name, phone, username, service, problem, app_time in records:
-        card_text = f"🆔 **Запись №{app_id}**\n👤 Пациент: {name}\n📞 {phone}\n⏰ {app_time}\n🩺 {service}: {problem}"
+        card_text = f"🆔 <b>Запись №{app_id}</b>\n👤 Пациент: {html.escape(name)}\n📞 {html.escape(phone)}\n⏰ {app_time}\n🩺 {html.escape(service)}: {html.escape(problem)}"
         
         markup = types.InlineKeyboardMarkup()
         markup.row(
@@ -413,7 +432,7 @@ def doctor_panel(message):
             types.InlineKeyboardButton("❌ Не пришёл", callback_data=f"status_noshow_{app_id}")
         )
         markup.row(types.InlineKeyboardButton("❌ Отменить", callback_data=f"cancel_{app_id}"))
-        bot.send_message(message.chat.id, card_text, reply_markup=markup, parse_mode="Markdown")
+        bot.send_message(message.chat.id, card_text, reply_markup=markup, parse_mode="HTML")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('status_'))
 def handle_status_change(call):
@@ -428,7 +447,9 @@ def handle_status_change(call):
 
     bot.answer_callback_query(call.id, "Статус обновлен!")
     status_text = "✅ Отмечено: Пришёл" if status == "completed" else "❌ Отмечено: Не пришёл"
-    bot.edit_message_text(f"{call.message.text}\n\n**{status_text}**", chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode="Markdown")
+    
+    # Чтобы не падало при редактировании, убираем старый текст сообщения и оставляем только статус
+    bot.edit_message_text(f"Запись №{app_id}\n\n<b>{status_text}</b>", chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode="HTML")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cancel_'))
 def handle_cancel_appointment(call):
@@ -469,12 +490,12 @@ def show_statistics(message):
         cancelled = cursor.fetchone()[0]
 
     stats_text = (
-        "📊 **СТАТИСТИКА КЛИНИКИ**\n\n"
+        "📊 <b>СТАТИСТИКА КЛИНИКИ</b>\n\n"
         f"👥 Всего записей: {total}\n"
         f"✅ Успешных визитов: {completed}\n"
         f"❌ Отменено: {cancelled}"
     )
-    bot.send_message(message.chat.id, stats_text, parse_mode="Markdown")
+    bot.send_message(message.chat.id, stats_text, parse_mode="HTML")
 
 # --- ДВУХУРОВНЕВЫЕ НАПОМИНАНИЯ ---
 def check_and_send_reminders():
@@ -490,12 +511,10 @@ def check_and_send_reminders():
                 app_dt = datetime.strptime(app_time_str, "%d.%m.%Y %H:%M").replace(tzinfo=TZ)
                 diff = app_dt - now
 
-                # Напоминание за 24 часа
                 if timedelta(hours=23) <= diff <= timedelta(hours=25) and not r24:
                     bot.send_message(user_id, f"🦷 Напоминаем: у вас завтра визит в клинику Stoma dent в {app_dt.strftime('%H:%M')}.")
                     cursor.execute("UPDATE appointments SET reminded_24h = 1 WHERE id = ?", (app_id,))
 
-                # Напоминание за 2 часа
                 elif timedelta(minutes=105) <= diff <= timedelta(minutes=135) and not r2:
                     bot.send_message(user_id, f"⏰ Напоминание: ваш визит в клинику Stoma dent через 2 часа ({app_dt.strftime('%H:%M')}). Ждем вас!")
                     cursor.execute("UPDATE appointments SET reminded_2h = 1 WHERE id = ?", (app_id,))
