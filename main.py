@@ -18,13 +18,6 @@ app = Flask('')
 
 user_data = {}
 
-MAIN_MENU_BUTTONS = [
-    "📅 Записаться на приём", "📋 Мои записи",
-    "🩺 Услуги и лечение", "📍 Как нас найти",
-    "⭐ Оценить лечение / Отзыв", "ℹ️ Информация",
-    "📋 Панель врача", "📊 Статистика", "📱 Главное меню клиента"
-]
-
 # --- FLASK ДЛЯ KEEP-ALIVE ---
 @app.route('/')
 def home():
@@ -97,11 +90,15 @@ def get_doctor_keyboard():
     markup.row("📱 Главное меню клиента")
     return markup
 
-# --- УМНЫЙ ОБРАБОТЧИК КНОПОК МЕНЮ (ИСПРАВЛЕНО) ---
-@bot.message_handler(func=lambda message: message.text and any(btn in message.text for btn in MAIN_MENU_BUTTONS))
-def handle_main_menu_buttons(message):
+# --- ГЛАВНЫЙ УНИВЕРСАЛЬНЫЙ ОБРАБОТЧИК КНОПОК МЕНЮ ---
+@bot.message_handler(func=lambda message: message.text and any(keyword in message.text for keyword in [
+    "Записаться на приём", "Мои записи", "Услуги и лечение", 
+    "Как нас найти", "Оценить лечение", "Отзыв", "Информация", 
+    "Статистика", "Панель врача", "Главное меню клиента"
+]))
+def handle_menu_router(message):
     chat_id = message.chat.id
-    bot.clear_step_handler_by_chat_id(chat_id)  # Сбрасываем зависшие шаги
+    bot.clear_step_handler_by_chat_id(chat_id)
     user_data.pop(chat_id, None)
 
     text = message.text
@@ -124,7 +121,7 @@ def handle_main_menu_buttons(message):
     elif "Главное меню клиента" in text:
         show_client_menu(message)
 
-# --- СТАРТ И НАВИГАЦИЯ ---
+# --- СТАРТ ---
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     chat_id = message.chat.id
@@ -163,7 +160,7 @@ def clinic_info(message):
         "📍 Адрес: г. Ташкент, Яшнабадский район, 1-й квартал Авиасозлар, 12\n"
         "🚇 Ориентир: метро Тузель (1-й этаж)\n"
         "⏰ Режим работы: Ежедневно с 09:00 до 19:00\n"
-        "📞 Телефон для связи: +998 (93) 508-11-88, +998 (90) 175-43-68"
+        "📞 Телефон: +998 (93) 508-11-88"
     )
     bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard())
 
@@ -214,7 +211,7 @@ def start_date_selection(chat_id, message_id=None):
 
     while days_added < 5:
         current_day += timedelta(days=1)
-        if current_day.weekday() == 6:  # Пропуск воскресенья
+        if current_day.weekday() == 6:
             continue
         
         days_ru = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
