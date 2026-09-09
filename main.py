@@ -11,7 +11,7 @@ from psycopg2.extras import RealDictCursor
 
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8657040766:AAHeBxOmF86zv__MaIzayHuoOoZ5B7ycSeo")
-DOCTOR_CHAT_ID = int(os.getenv("DOCTOR_CHAT_ID", "934720885"))
+DOCTOR_CHAT_ID = int(os.getenv("DOCTOR_CHAT_ID", "427415684"))
 TZ = ZoneInfo("Asia/Tashkent")
 
 # Строка подключения к Supabase PostgreSQL
