@@ -97,31 +97,31 @@ def get_doctor_keyboard():
     markup.row("📱 Главное меню клиента")
     return markup
 
-# --- СТРОГАЯ ОЧИСТКА ШАГОВ ПРИ КЛИКЕ НА МЕНЮ ---
-@bot.message_handler(func=lambda message: message.text in MAIN_MENU_BUTTONS)
+# --- УМНЫЙ ОБРАБОТЧИК КНОПОК МЕНЮ (ИСПРАВЛЕНО) ---
+@bot.message_handler(func=lambda message: message.text and any(btn in message.text for btn in MAIN_MENU_BUTTONS))
 def handle_main_menu_buttons(message):
     chat_id = message.chat.id
-    bot.clear_step_handler_by_chat_id(chat_id)  # Сбрасываем любые зависшие шаги ввода
+    bot.clear_step_handler_by_chat_id(chat_id)  # Сбрасываем зависшие шаги
     user_data.pop(chat_id, None)
 
     text = message.text
-    if text == "📅 Записаться на приём":
+    if "Записаться на приём" in text:
         start_booking_button(message)
-    elif text == "📋 Мои записи":
+    elif "Мои записи" in text:
         show_my_appointments(message)
-    elif text == "🩺 Услуги и лечение":
+    elif "Услуги и лечение" in text:
         services_info(message)
-    elif text == "📍 Как нас найти":
+    elif "Как нас найти" in text:
         send_location(message)
-    elif text == "⭐ Оценить лечение / Отзыв":
+    elif "Оценить лечение" in text or "Отзыв" in text:
         ask_rating(message)
-    elif text == "ℹ️ Информация":
+    elif "Информация" in text:
         clinic_info(message)
-    elif text == "📊 Статистика":
+    elif "Статистика" in text:
         show_statistics(message)
-    elif text == "📋 Панель врача":
+    elif "Панель врача" in text:
         doctor_panel_menu(message)
-    elif text == "📱 Главное меню клиента":
+    elif "Главное меню клиента" in text:
         show_client_menu(message)
 
 # --- СТАРТ И НАВИГАЦИЯ ---
@@ -214,7 +214,7 @@ def start_date_selection(chat_id, message_id=None):
 
     while days_added < 5:
         current_day += timedelta(days=1)
-        if current_day.weekday() == 6:  # Пропуск воскресенья, если нужно
+        if current_day.weekday() == 6:  # Пропуск воскресенья
             continue
         
         days_ru = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -334,7 +334,8 @@ def process_problem(message):
         types.InlineKeyboardButton("✅ Подтвердить", callback_data="confirm_booking"),
         types.InlineKeyboardButton("❌ Отменить", callback_data="cancel_booking_process")
     )
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="HTML", reply_markup_to_remove=True)
+    
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="HTML")
 
 @bot.callback_query_handler(func=lambda call: call.data in ["confirm_booking", "cancel_booking_process"])
 def finalize_booking(call):
@@ -481,7 +482,6 @@ def skip_comment_callback(call):
     bot.clear_step_handler_by_chat_id(chat_id)
     
     data = user_data.get(chat_id, {})
-    rating = data.get("rating", "⭐5")
     rating_val = data.get("rating_val", 5)
 
     with get_db_connection() as conn:
