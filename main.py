@@ -518,7 +518,7 @@ def save_comment_step(message):
     except Exception:
         pass
 
-# --- ПАНЕЛЬ ВРАЧА И СТАТИСТИКА ---
+# --- ПАНЕЛЬ ВРАЧА И РАСШИРЕННАЯ СТАТИСТИКА ---
 def doctor_panel_menu(message):
     if message.chat.id != DOCTOR_CHAT_ID:
         return
@@ -621,26 +621,80 @@ def show_statistics(message):
     if message.chat.id != DOCTOR_CHAT_ID:
         return
     try:
+        now = datetime.now(TZ)
+        current_month_str = now.strftime("%m.%Y") # формат месяца в appointment_time (например, ".06.2026")
+
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            
+            # 1. Всего пациентов (уникальных)
             cursor.execute("SELECT COUNT(DISTINCT user_id) FROM appointments")
             total_patients = cursor.fetchone()[0] or 0
+
+            # 2. Записи за текущий месяц
+            cursor.execute("SELECT COUNT(*) FROM appointments WHERE appointment_time LIKE ?", (f"%{current_month_str}%",))
+            month_appointments = cursor.fetchone()[0] or 0
+
+            # 3. Статусы: пришел (completed), не пришёл (noshow), отменили (cancelled)
             cursor.execute("SELECT COUNT(*) FROM appointments WHERE status='completed'")
-            completed = cursor.fetchone()[0] or 0
+            completed_count = cursor.fetchone()[0] or 0
+
+            cursor.execute("SELECT COUNT(*) FROM appointments WHERE status='noshow'")
+            noshow_count = cursor.fetchone()[0] or 0
+
+            cursor.execute("SELECT COUNT(*) FROM appointments WHERE status='cancelled'")
+            cancelled_count = cursor.fetchone()[0] or 0
+
+            # 4. Процент явок (от завершенных и не-пришедших)
+            total_finished = completed_count + noshow_count
+            attendance_rate = round((completed_count / total_finished * 100), 1) if total_finished > 0 else 0.0
+
+            # 5. Средняя оценка и отзывы
             cursor.execute("SELECT AVG(rating), COUNT(*) FROM reviews")
             rev = cursor.fetchone()
             avg_rating = round(rev[0], 1) if rev and rev[0] else 0.0
             total_reviews = rev[1] if rev else 0
 
+            # 6. Самые популярные услуги
+            cursor.execute("SELECT service, COUNT(*) as cnt FROM appointments GROUP BY service ORDER BY cnt DESC LIMIT 3")
+            top_services = cursor.fetchall()
+
+            # 7. Ближайшие записи по дням (на ближайшие 3 дня)
+            upcoming_days_text = ""
+            for i in range(3):
+                target_date = now + timedelta(days=i)
+                d_str = target_date.strftime("%d.%m.%Y")
+                d_label = "Сегодня" if i == 0 else ("Завтра" if i == 1 else target_date.strftime("%d.%m"))
+                
+                cursor.execute("SELECT COUNT(*) FROM appointments WHERE status='active' AND appointment_time LIKE ?", (f"{d_str}%",))
+                cnt_day = cursor.fetchone()[0] or 0
+                upcoming_days_text += f"• {d_label} ({d_str}): <b>{cnt_day}</b> заявок\n"
+
+        # Формирование текста популярных услуг
+        services_text = ""
+        if top_services:
+            for s_name, s_cnt in top_services:
+                services_text += f"  - {s_name}: {s_cnt} раз(а)\n"
+        else:
+            services_text = "  - Пока нет данных\n"
+
         stats = (
-            f"📊 <b>СТАТИСТИКА КЛИНИКИ</b>\n\n"
-            f"👥 Всего пациентов: <b>{total_patients}</b>\n"
-            f"✅ Успешных приемов: <b>{completed}</b>\n"
-            f"⭐ Средняя оценка: <b>{avg_rating} / 5</b> (на основе {total_reviews} отзывов)"
+            f"📊 <b>РАСШИРЕННАЯ СТАТИСТИКА КЛИНИКИ</b>\n\n"
+            f"👥 Всего уникальных пациентов: <b>{total_patients}</b>\n"
+            f"📆 Записей за текущий месяц: <b>{month_appointments}</b>\n\n"
+            f"<b>Статистика визитов:</b>\n"
+            f"  ✅ Пришёл (успешно): <b>{completed_count}</b>\n"
+            f"  ❌ Не пришёл: <b>{noshow_count}</b>\n"
+            f"  🚫 Отменено: <b>{cancelled_count}</b>\n"
+            f"  📈 Процент явок: <b>{attendance_rate}%</b>\n\n"
+            f"⭐ Средняя оценка: <b>{avg_rating} / 5</b> (отзывов: {total_reviews})\n\n"
+            f"🦷 <b>Топ услуг:</b>\n{services_text}\n"
+            f"📅 <b>Ближайшие записи по дням:</b>\n{upcoming_days_text}"
         )
+        
         bot.send_message(message.chat.id, stats, parse_mode="HTML")
     except Exception as e:
-        bot.send_message(message.chat.id, f"Ошибка: {e}")
+        bot.send_message(message.chat.id, f"Ошибка при подсчете статистики: {e}")
 
 # --- НАПОМИНАНИЯ ---
 def check_and_send_reminders():
