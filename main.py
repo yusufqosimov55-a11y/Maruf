@@ -18,7 +18,6 @@ app = Flask('')
 
 user_data = {}
 
-# Список системных кнопок для защиты от ложных срабатываний
 MAIN_MENU_BUTTONS = [
     "📅 Записаться на приём", "📋 Мои записи",
     "🩺 Услуги и лечение", "📍 Как нас найти",
@@ -183,7 +182,7 @@ def send_location(message):
     )
     bot.send_location(chat_id, latitude=41.295246, longitude=69.338661)
 
-# --- ПРОЦЕСС ЗАПИСИ ---
+# --- ПРОЦЕСС ЗАПИСИ (ИСПРАВЛЕННЫЙ) ---
 @bot.message_handler(func=lambda message: message.text in ["📅 Записаться на приём", "/book"])
 def start_booking_button(message):
     user_data.pop(message.chat.id, None)
@@ -204,9 +203,12 @@ def start_booking_button(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("srv_"))
 def process_service_choice(call):
     service_name = call.data.replace("srv_", "")
-    user_data[call.message.chat.id] = {"service": service_name}
+    chat_id = call.message.chat.id
+    if chat_id not in user_data:
+        user_data[chat_id] = {}
+    user_data[chat_id]["service"] = service_name
     bot.answer_callback_query(call.id)
-    start_date_selection(call.message.chat.id, call.message.message_id)
+    start_date_selection(chat_id, call.message.message_id)
 
 def start_date_selection(chat_id, message_id=None):
     markup = types.InlineKeyboardMarkup()
@@ -239,9 +241,11 @@ def start_date_selection(chat_id, message_id=None):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("date_"))
 def choose_time(call):
     selected_date = call.data.split("_")[1]
-    if call.message.chat.id not in user_data:
-        user_data[call.message.chat.id] = {}
-    user_data[call.message.chat.id]["date"] = selected_date
+    chat_id = call.message.chat.id
+    if chat_id not in user_data:
+        user_data[chat_id] = {}
+    user_data[chat_id]["date"] = selected_date
+    bot.answer_callback_query(call.id)
 
     all_times = ["09:00", "10:30", "12:00", "14:00", "15:30", "17:00"]
     booked_times = get_booked_times(selected_date)
@@ -250,7 +254,7 @@ def choose_time(call):
     if not available_times:
         bot.edit_message_text(
             f"На дату {selected_date} свободных мест нет. Пожалуйста, выберите другую дату.",
-            chat_id=call.message.chat.id,
+            chat_id=chat_id,
             message_id=call.message.message_id
         )
         return
@@ -267,7 +271,7 @@ def choose_time(call):
 
     bot.edit_message_text(
         f"Выбранная дата: {selected_date}\nДоступное время:",
-        chat_id=call.message.chat.id,
+        chat_id=chat_id,
         message_id=call.message.message_id,
         reply_markup=markup
     )
@@ -281,6 +285,11 @@ def ask_name(call):
     user_data[chat_id]["time"] = selected_time
 
     bot.answer_callback_query(call.id)
+    try:
+        bot.delete_message(chat_id, call.message.message_id)
+    except Exception:
+        pass
+
     msg = bot.send_message(chat_id, "Введите ваше ФИО (Имя и Фамилию):", reply_markup=get_main_keyboard())
     bot.register_next_step_handler(msg, process_name)
 
@@ -445,7 +454,7 @@ def handle_user_cancel(call):
     except Exception:
         pass
 
-# --- СИСТЕМА ОТЗЫВОВ (ИСПРАВЛЕНА ПОЛНОСТЬЮ) ---
+# --- СИСТЕМА ОТЗЫВОВ ---
 @bot.message_handler(func=lambda message: message.text == "⭐ Оценить лечение / Отзыв")
 def ask_rating(message):
     user_data.pop(message.chat.id, None)
@@ -457,7 +466,6 @@ def ask_rating(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("rate_"))
 def process_rating_stars(call):
-    # Поддерживаем как обычные отзывы, так и отзывы после визита
     is_after_visit = "rate_after_" in call.data
     stars = call.data.replace("rate_after_", "").replace("rate_", "")
 
@@ -481,7 +489,6 @@ def process_rating_stars(call):
         message_id=call.message.message_id,
         reply_markup=markup
     )
-    # Регистрируем шаг ожидания комментария
     bot.register_next_step_handler(call.message, save_comment_step)
 
 @bot.callback_query_handler(func=lambda call: call.data == "skip_comment")
@@ -500,7 +507,6 @@ def skip_comment_callback(call):
                        (chat_id, rating_val, "", datetime.now(TZ).strftime("%Y-%m-%d %H:%M")))
         conn.commit()
 
-    # Чистим стейт, чтобы окно закрылось и диалог сбросился
     user_data.pop(chat_id, None)
 
     bot.edit_message_text("Спасибо за отзыв! ❤️ Хорошего дня!", chat_id=chat_id, message_id=call.message.message_id)
@@ -518,13 +524,10 @@ def skip_comment_callback(call):
 
 def save_comment_step(message):
     chat_id = message.chat.id
-    
-    # Если юзер нажал кнопку меню во время ввода отзыва — прерываем отзыв
     if check_menu_interruption(message):
         return
         
     data = user_data.get(chat_id, {})
-    # Если пользователь уже закрыл/пропустил отзыв, игнорируем текст
     if not data.get("awaiting_comment"):
         return
 
