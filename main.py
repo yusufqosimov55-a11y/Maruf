@@ -1288,17 +1288,38 @@ def handle_status_change(call):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        # Нельзя отметить будущую запись как «пришёл» или «не пришёл».
+        # Проверка выполняется в БД в рамках той же транзакции, чтобы
+        # статус нельзя было изменить заранее даже при прямом callback.
         cur.execute("""
             UPDATE appointments
             SET status=%s, status_updated_at=NOW()
-            WHERE id=%s AND status='active'
+            WHERE id=%s
+              AND status='active'
+              AND appointment_at <= NOW()
             RETURNING user_id, patient_name, appointment_at
         """, (status, app_id))
         row = cur.fetchone()
         if not row:
+            cur.execute("""
+                SELECT status, appointment_at
+                FROM appointments
+                WHERE id=%s
+            """, (app_id,))
+            existing = cur.fetchone()
             conn.rollback()
-            bot.answer_callback_query(call.id, "Статус уже изменён.")
-            bot.edit_message_text(f"Запись №{app_id}\n\nℹ️ Статус уже был изменён.", call.message.chat.id, call.message.message_id)
+            if not existing:
+                bot.answer_callback_query(call.id, "Запись не найдена.", show_alert=True)
+                return
+            if existing[0] != "active":
+                bot.answer_callback_query(call.id, "Статус уже изменён.")
+                bot.edit_message_text(f"Запись №{app_id}\n\nℹ️ Статус уже был изменён.", call.message.chat.id, call.message.message_id)
+                return
+            bot.answer_callback_query(
+                call.id,
+                "Время приёма ещё не наступило. Отметить визит можно после времени записи.",
+                show_alert=True,
+            )
             return
         conn.commit()
     except Exception:
