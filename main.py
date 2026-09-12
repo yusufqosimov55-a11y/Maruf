@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import os
 import html
 import logging
@@ -19,32 +17,30 @@ from psycopg2.extras import RealDictCursor
 # Dr. Maruf / Stoma dent Telegram bot
 # ============================================================
 
-BOT_VERSION = "2026-09-12-fixed-v3"
-
 TZ = ZoneInfo(os.getenv("TZ", "Asia/Tashkent"))
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 DOCTOR_CHAT_ID_RAW = os.getenv("DOCTOR_CHAT_ID")
 
 if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN не задан в переменных окружения")
+    raise RuntimeError("BOT_TOKEN is not set")
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL не задан в переменных окружения")
+    raise RuntimeError("DATABASE_URL is not set")
 if not DOCTOR_CHAT_ID_RAW:
-    raise RuntimeError("DOCTOR_CHAT_ID не задан в переменных окружения")
+    raise RuntimeError("DOCTOR_CHAT_ID is not set")
 try:
     DOCTOR_CHAT_ID = int(DOCTOR_CHAT_ID_RAW)
 except ValueError as exc:
-    raise RuntimeError("DOCTOR_CHAT_ID должен быть целым числом") from exc
+    raise RuntimeError("DOCTOR_CHAT_ID must be an integer") from exc
 
 CLINIC_NAME = os.getenv("CLINIC_NAME", "Stoma dent")
 CLINIC_ADDRESS = os.getenv(
     "CLINIC_ADDRESS",
-    "г. Ташкент, Яшнабадский район, 1-й квартал Авиасозлар, 12",
+    "Ð³. Ð¢Ð°ÑÐºÐµÐ½Ñ, Ð¯ÑÐ½Ð°Ð±Ð°Ð´ÑÐºÐ¸Ð¹ ÑÐ°Ð¹Ð¾Ð½, 1-Ð¹ ÐºÐ²Ð°ÑÑÐ°Ð» ÐÐ²Ð¸Ð°ÑÐ¾Ð·Ð»Ð°Ñ, 12",
 )
-CLINIC_LANDMARK = os.getenv("CLINIC_LANDMARK", "метро Тузель, 1-й этаж")
+CLINIC_LANDMARK = os.getenv("CLINIC_LANDMARK", "Ð¼ÐµÑÑÐ¾ Ð¢ÑÐ·ÐµÐ»Ñ, 1-Ð¹ ÑÑÐ°Ð¶")
 CLINIC_PHONE = os.getenv("CLINIC_PHONE", "+998 (93) 508-11-88")
-CLINIC_HOURS = os.getenv("CLINIC_HOURS", "Ежедневно с 09:00 до 19:00")
+CLINIC_HOURS = os.getenv("CLINIC_HOURS", "ÐÐ¶ÐµÐ´Ð½ÐµÐ²Ð½Ð¾ Ñ 09:00 Ð´Ð¾ 19:00")
 
 # Coordinates are intentionally not hard-coded until the exact clinic pin is verified.
 CLINIC_LAT = os.getenv("CLINIC_LAT")
@@ -59,13 +55,13 @@ BOOKING_DAYS = int(os.getenv("BOOKING_DAYS", "5"))
 
 SLOTS = ["09:00", "10:30", "12:00", "14:00", "15:30", "17:00"]
 SERVICES = {
-    "1": "🦷 Лечение зуба",
-    "2": "✨ Чистка",
-    "3": "😁 Отбеливание",
-    "4": "👑 Коронка",
-    "5": "❌ Удаление",
-    "6": "💊 Противовоспалительное лечение",
-    "7": "❓ Другое",
+    "1": "ð¦· ÐÐµÑÐµÐ½Ð¸Ðµ Ð·ÑÐ±Ð°",
+    "2": "â¨ Ð§Ð¸ÑÑÐºÐ°",
+    "3": "ð ÐÑÐ±ÐµÐ»Ð¸Ð²Ð°Ð½Ð¸Ðµ",
+    "4": "ð ÐÐ¾ÑÐ¾Ð½ÐºÐ°",
+    "5": "â Ð£Ð´Ð°Ð»ÐµÐ½Ð¸Ðµ",
+    "6": "ð ÐÑÐ¾ÑÐ¸Ð²Ð¾Ð²Ð¾ÑÐ¿Ð°Ð»Ð¸ÑÐµÐ»ÑÐ½Ð¾Ðµ Ð»ÐµÑÐµÐ½Ð¸Ðµ",
+    "7": "â ÐÑÑÐ³Ð¾Ðµ",
 }
 
 MAX_NAME_LEN = 120
@@ -86,10 +82,10 @@ app = Flask(__name__)
 user_data = {}
 state_lock = Lock()
 
-DAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+DAYS_RU = ["ÐÐ½", "ÐÑ", "Ð¡Ñ", "Ð§Ñ", "ÐÑ", "Ð¡Ð±", "ÐÑ"]
 MONTHS_RU = [
-    "января", "февраля", "марта", "апреля", "мая", "июня",
-    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+    "ÑÐ½Ð²Ð°ÑÑ", "ÑÐµÐ²ÑÐ°Ð»Ñ", "Ð¼Ð°ÑÑÐ°", "Ð°Ð¿ÑÐµÐ»Ñ", "Ð¼Ð°Ñ", "Ð¸ÑÐ½Ñ",
+    "Ð¸ÑÐ»Ñ", "Ð°Ð²Ð³ÑÑÑÐ°", "ÑÐµÐ½ÑÑÐ±ÑÑ", "Ð¾ÐºÑÑÐ±ÑÑ", "Ð½Ð¾ÑÐ±ÑÑ", "Ð´ÐµÐºÐ°Ð±ÑÑ",
 ]
 
 
@@ -138,7 +134,7 @@ def cancel_steps(chat_id):
     try:
         bot.clear_step_handler_by_chat_id(chat_id)
     except Exception:
-        logger.exception("Не удалось очистить обработчик шага")
+        logger.exception("Failed to clear step handler")
 
 
 def reset_flow(chat_id):
@@ -154,12 +150,8 @@ def normalize_phone(raw):
     if not raw:
         return None
     phone = re.sub(r"[^\d+]", "", str(raw).strip())
-    # Uzbek local formats: 90XXXXXXX (9 digits), 8 90XXXXXXX (10 digits),
-    # 99890XXXXXXX (12 digits) and +99890XXXXXXX (13 characters).
-    if phone.startswith("8") and len(phone) == 10:
+    if phone.startswith("8") and len(phone) == 9:
         phone = "+998" + phone[1:]
-    elif phone.isdigit() and len(phone) == 9:
-        phone = "+998" + phone
     elif phone.startswith("998") and len(phone) == 12:
         phone = "+" + phone
     elif phone.startswith("+998") and len(phone) == 13:
@@ -175,11 +167,12 @@ def valid_name(text):
     text = " ".join((text or "").split())
     if len(text) < 3 or len(text) > MAX_NAME_LEN:
         return False
-    return bool(re.fullmatch(r"[A-Za-zА-Яа-яЁёЎўҚқҒғҲҳІіЪъЬь\- ']+", text))
+    return bool(re.fullmatch(r"[A-Za-zÐ-Ð¯Ð°-ÑÐÑÐÑÒÒÒÒÒ²Ò³ÐÑÐªÑÐ¬Ñ\- ']+", text))
 
 
 def valid_problem(text):
-    return bool(text and len(text.strip()) <= MAX_PROBLEM_LEN)
+    cleaned = (text or "").strip()
+    return bool(cleaned) and len(cleaned) <= MAX_PROBLEM_LEN
 
 
 def appointment_dt_from_state(data):
@@ -199,7 +192,7 @@ def send_main_menu(chat_id, text):
 
 @app.route("/")
 def home():
-    return "Telegram-бот Stoma dent работает!", 200
+    return "Stoma dent Telegram Bot is active!", 200
 
 
 @app.route("/health")
@@ -231,7 +224,7 @@ def init_db():
                 patient_name VARCHAR(120) NOT NULL,
                 phone_number VARCHAR(30) NOT NULL,
                 username VARCHAR(255) DEFAULT '',
-                service VARCHAR(120) NOT NULL DEFAULT 'Консультация',
+                service VARCHAR(120) NOT NULL DEFAULT 'ÐÐ¾Ð½ÑÑÐ»ÑÑÐ°ÑÐ¸Ñ',
                 problem VARCHAR(1000) NOT NULL DEFAULT '',
                 appointment_at TIMESTAMPTZ,
                 status VARCHAR(20) NOT NULL DEFAULT 'active',
@@ -247,7 +240,7 @@ def init_db():
                 user_id BIGINT NOT NULL,
                 rating SMALLINT NOT NULL,
                 comment VARCHAR(1500) NOT NULL DEFAULT '',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                created_at TEXT NOT NULL
             )
         """)
 
@@ -257,7 +250,6 @@ def init_db():
         cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()")
         cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminded_2h BOOLEAN NOT NULL DEFAULT FALSE")
         cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminded_24h BOOLEAN NOT NULL DEFAULT FALSE")
-        cur.execute("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS created_at_ts TIMESTAMPTZ NOT NULL DEFAULT NOW()")
 
         # Legacy project stored appointment_time as DD.MM.YYYY HH:MM text.
         cur.execute("""
@@ -317,10 +309,10 @@ def init_db():
         """)
 
         conn.commit()
-        logger.info("База данных инициализирована/обновлена")
+        logger.info("Database initialized/upgraded")
     except Exception:
         conn.rollback()
-        logger.exception("Не удалось инициализировать базу данных")
+        logger.exception("Database initialization failed")
         raise
     finally:
         cur.close()
@@ -328,18 +320,7 @@ def init_db():
 
 
 def create_appointment(data, user_id, username):
-    try:
-        appointment_at = appointment_dt_from_state(data)
-    except (KeyError, ValueError):
-        return None, "invalid"
-
-    if appointment_at <= now_local():
-        return None, "invalid"
-    if appointment_at.strftime("%H:%M") not in SLOTS:
-        return None, "invalid"
-    if appointment_at.weekday() not in OPEN_WEEKDAYS:
-        return None, "invalid"
-
+    appointment_at = appointment_dt_from_state(data)
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -371,7 +352,7 @@ def create_appointment(data, user_id, username):
             RETURNING id
         """, (
             user_id, data["name"], data["phone"], username or "",
-            data.get("service", "Консультация"), data["problem"], appointment_at,
+            data.get("service", "ÐÐ¾Ð½ÑÑÐ»ÑÑÐ°ÑÐ¸Ñ"), data["problem"], appointment_at,
         ))
         app_id = cur.fetchone()["id"]
         conn.commit()
@@ -394,22 +375,22 @@ def create_appointment(data, user_id, username):
 
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
-    markup.row("📅 Записаться на приём", "📋 Мои записи")
-    markup.row("🩺 Услуги и лечение", "📍 Как нас найти")
-    markup.row("⭐ Оценить лечение / Отзыв", "ℹ️ Информация")
+    markup.row("ð ÐÐ°Ð¿Ð¸ÑÐ°ÑÑÑÑ Ð½Ð° Ð¿ÑÐ¸ÑÐ¼", "ð ÐÐ¾Ð¸ Ð·Ð°Ð¿Ð¸ÑÐ¸")
+    markup.row("ð©º Ð£ÑÐ»ÑÐ³Ð¸ Ð¸ Ð»ÐµÑÐµÐ½Ð¸Ðµ", "ð ÐÐ°Ðº Ð½Ð°Ñ Ð½Ð°Ð¹ÑÐ¸")
+    markup.row("â­ ÐÑÐµÐ½Ð¸ÑÑ Ð»ÐµÑÐµÐ½Ð¸Ðµ / ÐÑÐ·ÑÐ²", "â¹ï¸ ÐÐ½ÑÐ¾ÑÐ¼Ð°ÑÐ¸Ñ")
     return markup
 
 
 def get_doctor_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
-    markup.row("📋 Панель врача", "📊 Статистика")
-    markup.row("📱 Главное меню клиента")
+    markup.row("ð ÐÐ°Ð½ÐµÐ»Ñ Ð²ÑÐ°ÑÐ°", "ð Ð¡ÑÐ°ÑÐ¸ÑÑÐ¸ÐºÐ°")
+    markup.row("ð± ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ ÐºÐ»Ð¸ÐµÐ½ÑÐ°")
     return markup
 
 
 def back_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    markup.row("⬅️ Отмена")
+    markup.row("â¬ï¸ ÐÑÐ¼ÐµÐ½Ð°")
     return markup
 
 
@@ -423,14 +404,14 @@ def start_cmd(message):
     if is_doctor(message.chat.id):
         bot.send_message(
             message.chat.id,
-            "👨‍⚕️ Здравствуйте, доктор Маруф!\nПанель врача готова.",
+            "ð¨ââï¸ ÐÐ´ÑÐ°Ð²ÑÑÐ²ÑÐ¹ÑÐµ, Ð´Ð¾ÐºÑÐ¾Ñ ÐÐ°ÑÑÑ!\nÐÐ°Ð½ÐµÐ»Ñ Ð²ÑÐ°ÑÐ° Ð³Ð¾ÑÐ¾Ð²Ð°.",
             reply_markup=get_doctor_keyboard(),
         )
     else:
         bot.send_message(
             message.chat.id,
-            "Здравствуйте! Вас приветствует бот стоматологической клиники "
-            "доктора Маруфа. 🦷\n\nВыберите действие в меню ниже.",
+            "ÐÐ´ÑÐ°Ð²ÑÑÐ²ÑÐ¹ÑÐµ! ÐÐ°Ñ Ð¿ÑÐ¸Ð²ÐµÑÑÑÐ²ÑÐµÑ Ð±Ð¾Ñ ÑÑÐ¾Ð¼Ð°ÑÐ¾Ð»Ð¾Ð³Ð¸ÑÐµÑÐºÐ¾Ð¹ ÐºÐ»Ð¸Ð½Ð¸ÐºÐ¸ "
+            "Ð´Ð¾ÐºÑÐ¾ÑÐ° ÐÐ°ÑÑÑÐ°. ð¦·\n\nÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´ÐµÐ¹ÑÑÐ²Ð¸Ðµ Ð² Ð¼ÐµÐ½Ñ Ð½Ð¸Ð¶Ðµ.",
             reply_markup=get_main_keyboard(),
         )
 
@@ -439,65 +420,65 @@ def start_cmd(message):
 def cancel_command(message):
     reset_flow(message.chat.id)
     keyboard = get_doctor_keyboard() if is_doctor(message.chat.id) else get_main_keyboard()
-    bot.send_message(message.chat.id, "❌ Текущая операция отменена.", reply_markup=keyboard)
+    bot.send_message(message.chat.id, "â Ð¢ÐµÐºÑÑÐ°Ñ Ð¾Ð¿ÐµÑÐ°ÑÐ¸Ñ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°.", reply_markup=keyboard)
 
 
-@bot.message_handler(func=lambda m: m.text == "⬅️ Отмена")
+@bot.message_handler(func=lambda m: m.text == "â¬ï¸ ÐÑÐ¼ÐµÐ½Ð°")
 def cancel_button(message):
     reset_flow(message.chat.id)
     keyboard = get_doctor_keyboard() if is_doctor(message.chat.id) else get_main_keyboard()
-    bot.send_message(message.chat.id, "❌ Отменено.", reply_markup=keyboard)
+    bot.send_message(message.chat.id, "â ÐÑÐ¼ÐµÐ½ÐµÐ½Ð¾.", reply_markup=keyboard)
 
 
 @bot.message_handler(func=lambda m: m.text in {
-    "📅 Записаться на приём", "📋 Мои записи", "🩺 Услуги и лечение",
-    "📍 Как нас найти", "⭐ Оценить лечение / Отзыв", "ℹ️ Информация",
-    "📋 Панель врача", "📊 Статистика", "📱 Главное меню клиента",
+    "ð ÐÐ°Ð¿Ð¸ÑÐ°ÑÑÑÑ Ð½Ð° Ð¿ÑÐ¸ÑÐ¼", "ð ÐÐ¾Ð¸ Ð·Ð°Ð¿Ð¸ÑÐ¸", "ð©º Ð£ÑÐ»ÑÐ³Ð¸ Ð¸ Ð»ÐµÑÐµÐ½Ð¸Ðµ",
+    "ð ÐÐ°Ðº Ð½Ð°Ñ Ð½Ð°Ð¹ÑÐ¸", "â­ ÐÑÐµÐ½Ð¸ÑÑ Ð»ÐµÑÐµÐ½Ð¸Ðµ / ÐÑÐ·ÑÐ²", "â¹ï¸ ÐÐ½ÑÐ¾ÑÐ¼Ð°ÑÐ¸Ñ",
+    "ð ÐÐ°Ð½ÐµÐ»Ñ Ð²ÑÐ°ÑÐ°", "ð Ð¡ÑÐ°ÑÐ¸ÑÑÐ¸ÐºÐ°", "ð± ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ ÐºÐ»Ð¸ÐµÐ½ÑÐ°",
 })
 def menu_router(message):
     reset_flow(message.chat.id)
     text = message.text
-    if text == "📅 Записаться на приём":
+    if text == "ð ÐÐ°Ð¿Ð¸ÑÐ°ÑÑÑÑ Ð½Ð° Ð¿ÑÐ¸ÑÐ¼":
         start_booking(message)
-    elif text == "📋 Мои записи":
+    elif text == "ð ÐÐ¾Ð¸ Ð·Ð°Ð¿Ð¸ÑÐ¸":
         show_my_appointments(message)
-    elif text == "🩺 Услуги и лечение":
+    elif text == "ð©º Ð£ÑÐ»ÑÐ³Ð¸ Ð¸ Ð»ÐµÑÐµÐ½Ð¸Ðµ":
         services_info(message)
-    elif text == "📍 Как нас найти":
+    elif text == "ð ÐÐ°Ðº Ð½Ð°Ñ Ð½Ð°Ð¹ÑÐ¸":
         send_location(message)
-    elif text == "⭐ Оценить лечение / Отзыв":
+    elif text == "â­ ÐÑÐµÐ½Ð¸ÑÑ Ð»ÐµÑÐµÐ½Ð¸Ðµ / ÐÑÐ·ÑÐ²":
         ask_rating(message)
-    elif text == "ℹ️ Информация":
+    elif text == "â¹ï¸ ÐÐ½ÑÐ¾ÑÐ¼Ð°ÑÐ¸Ñ":
         clinic_info(message)
-    elif text == "📋 Панель врача":
+    elif text == "ð ÐÐ°Ð½ÐµÐ»Ñ Ð²ÑÐ°ÑÐ°":
         doctor_panel_menu(message)
-    elif text == "📊 Статистика":
+    elif text == "ð Ð¡ÑÐ°ÑÐ¸ÑÑÐ¸ÐºÐ°":
         show_statistics(message)
-    elif text == "📱 Главное меню клиента":
+    elif text == "ð± ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ ÐºÐ»Ð¸ÐµÐ½ÑÐ°":
         show_client_menu(message)
 
 
 def show_client_menu(message):
-    send_main_menu(message.chat.id, "Переключено на меню клиента.")
+    send_main_menu(message.chat.id, "ÐÐµÑÐµÐºÐ»ÑÑÐµÐ½Ð¾ Ð½Ð° Ð¼ÐµÐ½Ñ ÐºÐ»Ð¸ÐµÐ½ÑÐ°.")
 
 
 def services_info(message):
     text = (
-        f"🏥 <b>Услуги {safe_text(CLINIC_NAME)}:</b>\n\n"
-        "• Лечение зуба\n• Профессиональная чистка\n• Отбеливание\n"
-        "• Коронки\n• Удаление\n• Противовоспалительное лечение\n\n"
-        "Нажмите «📅 Записаться на приём», чтобы выбрать услугу и время."
+        f"ð¥ <b>Ð£ÑÐ»ÑÐ³Ð¸ {safe_text(CLINIC_NAME)}:</b>\n\n"
+        "â¢ ÐÐµÑÐµÐ½Ð¸Ðµ Ð·ÑÐ±Ð°\nâ¢ ÐÑÐ¾ÑÐµÑÑÐ¸Ð¾Ð½Ð°Ð»ÑÐ½Ð°Ñ ÑÐ¸ÑÑÐºÐ°\nâ¢ ÐÑÐ±ÐµÐ»Ð¸Ð²Ð°Ð½Ð¸Ðµ\n"
+        "â¢ ÐÐ¾ÑÐ¾Ð½ÐºÐ¸\nâ¢ Ð£Ð´Ð°Ð»ÐµÐ½Ð¸Ðµ\nâ¢ ÐÑÐ¾ÑÐ¸Ð²Ð¾Ð²Ð¾ÑÐ¿Ð°Ð»Ð¸ÑÐµÐ»ÑÐ½Ð¾Ðµ Ð»ÐµÑÐµÐ½Ð¸Ðµ\n\n"
+        "ÐÐ°Ð¶Ð¼Ð¸ÑÐµ Â«ð ÐÐ°Ð¿Ð¸ÑÐ°ÑÑÑÑ Ð½Ð° Ð¿ÑÐ¸ÑÐ¼Â», ÑÑÐ¾Ð±Ñ Ð²ÑÐ±ÑÐ°ÑÑ ÑÑÐ»ÑÐ³Ñ Ð¸ Ð²ÑÐµÐ¼Ñ."
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=get_main_keyboard())
 
 
 def clinic_info(message):
     text = (
-        f"👨‍⚕️ <b>{safe_text(CLINIC_NAME)}</b>\n\n"
-        f"📍 <b>Адрес:</b> {safe_text(CLINIC_ADDRESS)}\n"
-        f"🚇 <b>Ориентир:</b> {safe_text(CLINIC_LANDMARK)}\n"
-        f"⏰ <b>Режим:</b> {safe_text(CLINIC_HOURS)}\n"
-        f"📞 <b>Телефон:</b> {safe_text(CLINIC_PHONE)}"
+        f"ð¨ââï¸ <b>{safe_text(CLINIC_NAME)}</b>\n\n"
+        f"ð <b>ÐÐ´ÑÐµÑ:</b> {safe_text(CLINIC_ADDRESS)}\n"
+        f"ð <b>ÐÑÐ¸ÐµÐ½ÑÐ¸Ñ:</b> {safe_text(CLINIC_LANDMARK)}\n"
+        f"â° <b>Ð ÐµÐ¶Ð¸Ð¼:</b> {safe_text(CLINIC_HOURS)}\n"
+        f"ð <b>Ð¢ÐµÐ»ÐµÑÐ¾Ð½:</b> {safe_text(CLINIC_PHONE)}"
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=get_main_keyboard())
 
@@ -506,20 +487,20 @@ def send_location(message):
     chat_id = message.chat.id
     bot.send_message(
         chat_id,
-        f"📍 <b>{safe_text(CLINIC_NAME)}</b>\n{safe_text(CLINIC_ADDRESS)}\n"
-        f"Ориентир: {safe_text(CLINIC_LANDMARK)}",
+        f"ð <b>{safe_text(CLINIC_NAME)}</b>\n{safe_text(CLINIC_ADDRESS)}\n"
+        f"ÐÑÐ¸ÐµÐ½ÑÐ¸Ñ: {safe_text(CLINIC_LANDMARK)}",
         parse_mode="HTML",
     )
     if CLINIC_LAT and CLINIC_LON:
         try:
             bot.send_location(chat_id, float(CLINIC_LAT), float(CLINIC_LON))
         except (ValueError, TypeError):
-            logger.warning("Некорректные координаты клиники")
+            logger.warning("Invalid clinic coordinates")
     else:
         bot.send_message(
             chat_id,
-            "📌 Точная геометка пока отключена, чтобы не отправлять непроверенную точку.\n"
-            f"Можно найти клинику по названию «{safe_text(CLINIC_NAME)}» и адресу выше.",
+            "ð Ð¢Ð¾ÑÐ½Ð°Ñ Ð³ÐµÐ¾Ð¼ÐµÑÐºÐ° Ð¿Ð¾ÐºÐ° Ð¾ÑÐºÐ»ÑÑÐµÐ½Ð°, ÑÑÐ¾Ð±Ñ Ð½Ðµ Ð¾ÑÐ¿ÑÐ°Ð²Ð»ÑÑÑ Ð½ÐµÐ¿ÑÐ¾Ð²ÐµÑÐµÐ½Ð½ÑÑ ÑÐ¾ÑÐºÑ.\n"
+            f"ÐÐ¾Ð¶Ð½Ð¾ Ð½Ð°Ð¹ÑÐ¸ ÐºÐ»Ð¸Ð½Ð¸ÐºÑ Ð¿Ð¾ Ð½Ð°Ð·Ð²Ð°Ð½Ð¸Ñ Â«{safe_text(CLINIC_NAME)}Â» Ð¸ Ð°Ð´ÑÐµÑÑ Ð²ÑÑÐµ.",
             reply_markup=get_main_keyboard(),
         )
 
@@ -535,15 +516,15 @@ def start_booking(message):
 
     markup = types.InlineKeyboardMarkup()
     markup.row(
-        types.InlineKeyboardButton("✅ Продолжить", callback_data="consent:yes"),
-        types.InlineKeyboardButton("❌ Отмена", callback_data="consent:no"),
+        types.InlineKeyboardButton("â ÐÑÐ¾Ð´Ð¾Ð»Ð¶Ð¸ÑÑ", callback_data="consent:yes"),
+        types.InlineKeyboardButton("â ÐÑÐ¼ÐµÐ½Ð°", callback_data="consent:no"),
     )
     bot.send_message(
         chat_id,
-        "🦷 <b>Запись на приём</b>\n\n"
-        "Для записи бот попросит ФИО, телефон и краткую причину визита. "
-        "Эти данные используются для организации приёма и связи с клиникой.\n\n"
-        "Продолжая, вы соглашаетесь на обработку этих данных для записи.",
+        "ð¦· <b>ÐÐ°Ð¿Ð¸ÑÑ Ð½Ð° Ð¿ÑÐ¸ÑÐ¼</b>\n\n"
+        "ÐÐ»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð±Ð¾Ñ Ð¿Ð¾Ð¿ÑÐ¾ÑÐ¸Ñ Ð¤ÐÐ, ÑÐµÐ»ÐµÑÐ¾Ð½ Ð¸ ÐºÑÐ°ÑÐºÑÑ Ð¿ÑÐ¸ÑÐ¸Ð½Ñ Ð²Ð¸Ð·Ð¸ÑÐ°. "
+        "Ð­ÑÐ¸ Ð´Ð°Ð½Ð½ÑÐµ Ð¸ÑÐ¿Ð¾Ð»ÑÐ·ÑÑÑÑÑ Ð´Ð»Ñ Ð¾ÑÐ³Ð°Ð½Ð¸Ð·Ð°ÑÐ¸Ð¸ Ð¿ÑÐ¸ÑÐ¼Ð° Ð¸ ÑÐ²ÑÐ·Ð¸ Ñ ÐºÐ»Ð¸Ð½Ð¸ÐºÐ¾Ð¹.\n\n"
+        "ÐÑÐ¾Ð´Ð¾Ð»Ð¶Ð°Ñ, Ð²Ñ ÑÐ¾Ð³Ð»Ð°ÑÐ°ÐµÑÐµÑÑ Ð½Ð° Ð¾Ð±ÑÐ°Ð±Ð¾ÑÐºÑ ÑÑÐ¸Ñ Ð´Ð°Ð½Ð½ÑÑ Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸.",
         parse_mode="HTML",
         reply_markup=markup,
     )
@@ -558,8 +539,8 @@ def show_service_selection(chat_id, message_id=None):
             for key, label in items[i:i + 2]
         ]
         markup.row(*row)
-    markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data="booking:cancel"))
-    text = "Выберите услугу:"
+    markup.add(types.InlineKeyboardButton("â ÐÑÐ¼ÐµÐ½Ð°", callback_data="booking:cancel"))
+    text = "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÑÐ»ÑÐ³Ñ:"
     if message_id:
         try:
             bot.edit_message_text(text, chat_id, message_id, reply_markup=markup)
@@ -575,8 +556,8 @@ def booking_consent(call):
     bot.answer_callback_query(call.id)
     if call.data == "consent:no":
         reset_flow(chat_id)
-        bot.edit_message_text("❌ Запись отменена.", chat_id, call.message.message_id)
-        bot.send_message(chat_id, "Главное меню:", reply_markup=get_main_keyboard())
+        bot.edit_message_text("â ÐÐ°Ð¿Ð¸ÑÑ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°.", chat_id, call.message.message_id)
+        bot.send_message(chat_id, "ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ:", reply_markup=get_main_keyboard())
         return
     show_service_selection(chat_id, call.message.message_id)
 
@@ -595,7 +576,7 @@ def next_open_dates(count=BOOKING_DAYS):
 def process_service_choice(call):
     key = call.data.split(":", 1)[1]
     if key not in SERVICES:
-        bot.answer_callback_query(call.id, "Услуга недоступна.")
+        bot.answer_callback_query(call.id, "Ð£ÑÐ»ÑÐ³Ð° Ð½ÐµÐ´Ð¾ÑÑÑÐ¿Ð½Ð°.")
         return
     set_state(call.message.chat.id, flow="booking", service=SERVICES[key])
     bot.answer_callback_query(call.id)
@@ -605,9 +586,9 @@ def process_service_choice(call):
 def show_date_selection(chat_id, message_id=None):
     markup = types.InlineKeyboardMarkup()
     for day in next_open_dates():
-        label = f"📅 {DAYS_RU[day.weekday()]}, {day.day} {MONTHS_RU[day.month - 1]}"
+        label = f"ð {DAYS_RU[day.weekday()]}, {day.day} {MONTHS_RU[day.month - 1]}"
         markup.add(types.InlineKeyboardButton(label, callback_data=f"date:{day:%d.%m.%Y}"))
-    text = "Выберите дату для визита:"
+    text = "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´Ð°ÑÑ Ð´Ð»Ñ Ð²Ð¸Ð·Ð¸ÑÐ°:"
     if message_id:
         try:
             bot.edit_message_text(text, chat_id, message_id, reply_markup=markup)
@@ -623,10 +604,10 @@ def choose_date(call):
     try:
         selected = datetime.strptime(value, "%d.%m.%Y").date()
     except ValueError:
-        bot.answer_callback_query(call.id, "Неверная дата.")
+        bot.answer_callback_query(call.id, "ÐÐµÐ²ÐµÑÐ½Ð°Ñ Ð´Ð°ÑÐ°.")
         return
-    if selected not in next_open_dates(BOOKING_DAYS + 2):
-        bot.answer_callback_query(call.id, "Эта дата больше недоступна.")
+    if selected not in next_open_dates(BOOKING_DAYS):
+        bot.answer_callback_query(call.id, "Ð­ÑÐ° Ð´Ð°ÑÐ° Ð±Ð¾Ð»ÑÑÐµ Ð½ÐµÐ´Ð¾ÑÑÑÐ¿Ð½Ð°.")
         return
     set_state(call.message.chat.id, date=value)
     bot.answer_callback_query(call.id)
@@ -636,36 +617,27 @@ def choose_date(call):
 def show_time_selection(chat_id, message_id, date_obj):
     start = datetime.combine(date_obj, time.min).replace(tzinfo=TZ)
     end = start + timedelta(days=1)
+    conn = get_db_connection()
+    cur = conn.cursor()
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        try:
-            cur.execute(
-                "SELECT appointment_at FROM appointments WHERE status='active' AND appointment_at >= %s AND appointment_at < %s",
-                (start, end),
-            )
-            booked = {
-                row["appointment_at"].astimezone(TZ).strftime("%H:%M")
-                for row in cur.fetchall()
-                if row["appointment_at"] is not None
-            }
-        finally:
-            cur.close()
-            conn.close()
-    except Exception:
-        logger.exception("Не удалось загрузить свободное время")
-        bot.edit_message_text(
-            "❌ Не удалось загрузить свободное время. Попробуйте ещё раз через минуту.",
-            chat_id, message_id,
+        cur.execute(
+            "SELECT appointment_at FROM appointments WHERE status='active' AND appointment_at >= %s AND appointment_at < %s",
+            (start, end),
         )
-        return
+        booked = {
+            row["appointment_at"].astimezone(TZ).strftime("%H:%M")
+            for row in cur.fetchall()
+        }
+    finally:
+        cur.close()
+        conn.close()
 
     available = [slot for slot in SLOTS if slot not in booked]
     markup = types.InlineKeyboardMarkup()
     if not available:
-        markup.add(types.InlineKeyboardButton("⬅️ Другая дата", callback_data="back:dates"))
+        markup.add(types.InlineKeyboardButton("â¬ï¸ ÐÑÑÐ³Ð°Ñ Ð´Ð°ÑÐ°", callback_data="back:dates"))
         bot.edit_message_text(
-            f"На {date_obj:%d.%m.%Y} свободных времён нет.",
+            f"ÐÐ° {date_obj:%d.%m.%Y} ÑÐ²Ð¾Ð±Ð¾Ð´Ð½ÑÑ Ð²ÑÐµÐ¼ÑÐ½ Ð½ÐµÑ.",
             chat_id, message_id, reply_markup=markup,
         )
         return
@@ -678,10 +650,10 @@ def show_time_selection(chat_id, message_id, date_obj):
             row = []
     if row:
         markup.row(*row)
-    markup.add(types.InlineKeyboardButton("⬅️ Другая дата", callback_data="back:dates"))
+    markup.add(types.InlineKeyboardButton("â¬ï¸ ÐÑÑÐ³Ð°Ñ Ð´Ð°ÑÐ°", callback_data="back:dates"))
 
     bot.edit_message_text(
-        f"📅 Дата: <b>{date_obj:%d.%m.%Y}</b>\n\nВыберите время:",
+        f"ð ÐÐ°ÑÐ°: <b>{date_obj:%d.%m.%Y}</b>\n\nÐÑÐ±ÐµÑÐ¸ÑÐµ Ð²ÑÐµÐ¼Ñ:",
         chat_id, message_id, reply_markup=markup, parse_mode="HTML",
     )
 
@@ -697,13 +669,13 @@ def choose_time(call):
     chat_id = call.message.chat.id
     selected = call.data.split(":", 1)[1]
     if selected not in SLOTS:
-        bot.answer_callback_query(call.id, "Неверное время.")
+        bot.answer_callback_query(call.id, "ÐÐµÐ²ÐµÑÐ½Ð¾Ðµ Ð²ÑÐµÐ¼Ñ.")
         return
     data = get_state(chat_id)
     if not data.get("service") or not data.get("date"):
         reset_flow(chat_id)
-        bot.answer_callback_query(call.id, "Сессия устарела.")
-        send_main_menu(chat_id, "Пожалуйста, начните запись заново.")
+        bot.answer_callback_query(call.id, "Ð¡ÐµÑÑÐ¸Ñ ÑÑÑÐ°ÑÐµÐ»Ð°.")
+        send_main_menu(chat_id, "ÐÐ¾Ð¶Ð°Ð»ÑÐ¹ÑÑÐ°, Ð½Ð°ÑÐ½Ð¸ÑÐµ Ð·Ð°Ð¿Ð¸ÑÑ Ð·Ð°Ð½Ð¾Ð²Ð¾.")
         return
     set_state(chat_id, time=selected)
     bot.answer_callback_query(call.id)
@@ -713,7 +685,7 @@ def choose_time(call):
         pass
     msg = bot.send_message(
         chat_id,
-        "👤 Введите ваше <b>ФИО</b> (Имя и Фамилия):",
+        "ð¤ ÐÐ²ÐµÐ´Ð¸ÑÐµ Ð²Ð°ÑÐµ <b>Ð¤ÐÐ</b> (ÐÐ¼Ñ Ð¸ Ð¤Ð°Ð¼Ð¸Ð»Ð¸Ñ):",
         parse_mode="HTML", reply_markup=back_keyboard(),
     )
     bot.register_next_step_handler(msg, process_name)
@@ -721,29 +693,29 @@ def choose_time(call):
 
 def process_name(message):
     chat_id = message.chat.id
-    if message.text == "⬅️ Отмена":
+    if message.text == "â¬ï¸ ÐÑÐ¼ÐµÐ½Ð°":
         cancel_button(message)
         return
     name = " ".join((message.text or "").split())
     if not valid_name(name):
         msg = bot.send_message(
             chat_id,
-            f"⚠️ Введите корректное ФИО (до {MAX_NAME_LEN} символов).",
+            f"â ï¸ ÐÐ²ÐµÐ´Ð¸ÑÐµ ÐºÐ¾ÑÑÐµÐºÑÐ½Ð¾Ðµ Ð¤ÐÐ (Ð´Ð¾ {MAX_NAME_LEN} ÑÐ¸Ð¼Ð²Ð¾Ð»Ð¾Ð²).",
             reply_markup=back_keyboard(),
         )
         bot.register_next_step_handler(msg, process_name)
         return
     set_state(chat_id, name=name)
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    markup.add(types.KeyboardButton("📞 Отправить номер телефона", request_contact=True))
-    markup.row("⬅️ Отмена")
-    msg = bot.send_message(chat_id, "📞 Отправьте номер телефона или введите его вручную.", reply_markup=markup)
+    markup.add(types.KeyboardButton("ð ÐÑÐ¿ÑÐ°Ð²Ð¸ÑÑ Ð½Ð¾Ð¼ÐµÑ ÑÐµÐ»ÐµÑÐ¾Ð½Ð°", request_contact=True))
+    markup.row("â¬ï¸ ÐÑÐ¼ÐµÐ½Ð°")
+    msg = bot.send_message(chat_id, "ð ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ Ð½Ð¾Ð¼ÐµÑ ÑÐµÐ»ÐµÑÐ¾Ð½Ð° Ð¸Ð»Ð¸ Ð²Ð²ÐµÐ´Ð¸ÑÐµ ÐµÐ³Ð¾ Ð²ÑÑÑÐ½ÑÑ.", reply_markup=markup)
     bot.register_next_step_handler(msg, process_phone)
 
 
 def process_phone(message):
     chat_id = message.chat.id
-    if message.text == "⬅️ Отмена":
+    if message.text == "â¬ï¸ ÐÑÐ¼ÐµÐ½Ð°":
         cancel_button(message)
         return
     raw = message.contact.phone_number if message.contact else message.text
@@ -751,7 +723,7 @@ def process_phone(message):
     if not phone or len(phone) > MAX_PHONE_LEN:
         msg = bot.send_message(
             chat_id,
-            "⚠️ Номер не распознан. Пример: +998 90 123 45 67",
+            "â ï¸ ÐÐ¾Ð¼ÐµÑ Ð½Ðµ ÑÐ°ÑÐ¿Ð¾Ð·Ð½Ð°Ð½. ÐÑÐ¸Ð¼ÐµÑ: +998 90 123 45 67",
             reply_markup=back_keyboard(),
         )
         bot.register_next_step_handler(msg, process_phone)
@@ -759,7 +731,7 @@ def process_phone(message):
     set_state(chat_id, phone=phone)
     msg = bot.send_message(
         chat_id,
-        f"💬 Опишите жалобу или причину визита (до {MAX_PROBLEM_LEN} символов).",
+        f"ð¬ ÐÐ¿Ð¸ÑÐ¸ÑÐµ Ð¶Ð°Ð»Ð¾Ð±Ñ Ð¸Ð»Ð¸ Ð¿ÑÐ¸ÑÐ¸Ð½Ñ Ð²Ð¸Ð·Ð¸ÑÐ° (Ð´Ð¾ {MAX_PROBLEM_LEN} ÑÐ¸Ð¼Ð²Ð¾Ð»Ð¾Ð²).",
         reply_markup=back_keyboard(),
     )
     bot.register_next_step_handler(msg, process_problem)
@@ -767,14 +739,14 @@ def process_phone(message):
 
 def process_problem(message):
     chat_id = message.chat.id
-    if message.text == "⬅️ Отмена":
+    if message.text == "â¬ï¸ ÐÑÐ¼ÐµÐ½Ð°":
         cancel_button(message)
         return
     problem = (message.text or "").strip()
     if not valid_problem(problem):
         msg = bot.send_message(
             chat_id,
-            f"⚠️ Напишите причину визита (не более {MAX_PROBLEM_LEN} символов).",
+            f"â ï¸ ÐÐ°Ð¿Ð¸ÑÐ¸ÑÐµ Ð¿ÑÐ¸ÑÐ¸Ð½Ñ Ð²Ð¸Ð·Ð¸ÑÐ° (Ð½Ðµ Ð±Ð¾Ð»ÐµÐµ {MAX_PROBLEM_LEN} ÑÐ¸Ð¼Ð²Ð¾Ð»Ð¾Ð²).",
             reply_markup=back_keyboard(),
         )
         bot.register_next_step_handler(msg, process_problem)
@@ -785,23 +757,23 @@ def process_problem(message):
         dt = appointment_dt_from_state(data)
     except (KeyError, ValueError):
         reset_flow(chat_id)
-        send_main_menu(chat_id, "⚠️ Сессия записи устарела. Начните запись заново.")
+        send_main_menu(chat_id, "â ï¸ Ð¡ÐµÑÑÐ¸Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ ÑÑÑÐ°ÑÐµÐ»Ð°. ÐÐ°ÑÐ½Ð¸ÑÐµ Ð·Ð°Ð¿Ð¸ÑÑ Ð·Ð°Ð½Ð¾Ð²Ð¾.")
         return
 
     text = (
-        "📋 <b>Проверьте данные:</b>\n\n"
-        f"👤 ФИО: {safe_text(data['name'])}\n"
-        f"📞 Телефон: {safe_text(data['phone'])}\n"
-        f"📅 Дата: {dt:%d.%m.%Y}\n"
-        f"⏰ Время: {dt:%H:%M}\n"
-        f"🦷 Услуга: {safe_text(data['service'])}\n"
-        f"💬 Жалоба: {safe_text(data['problem'])}\n\n"
-        "Всё верно?"
+        "ð <b>ÐÑÐ¾Ð²ÐµÑÑÑÐµ Ð´Ð°Ð½Ð½ÑÐµ:</b>\n\n"
+        f"ð¤ Ð¤ÐÐ: {safe_text(data['name'])}\n"
+        f"ð Ð¢ÐµÐ»ÐµÑÐ¾Ð½: {safe_text(data['phone'])}\n"
+        f"ð ÐÐ°ÑÐ°: {dt:%d.%m.%Y}\n"
+        f"â° ÐÑÐµÐ¼Ñ: {dt:%H:%M}\n"
+        f"ð¦· Ð£ÑÐ»ÑÐ³Ð°: {safe_text(data['service'])}\n"
+        f"ð¬ ÐÐ°Ð»Ð¾Ð±Ð°: {safe_text(data['problem'])}\n\n"
+        "ÐÑÑ Ð²ÐµÑÐ½Ð¾?"
     )
     markup = types.InlineKeyboardMarkup()
     markup.row(
-        types.InlineKeyboardButton("✅ Подтвердить", callback_data="booking:confirm"),
-        types.InlineKeyboardButton("❌ Отменить", callback_data="booking:cancel"),
+        types.InlineKeyboardButton("â ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ", callback_data="booking:confirm"),
+        types.InlineKeyboardButton("â ÐÑÐ¼ÐµÐ½Ð¸ÑÑ", callback_data="booking:cancel"),
     )
     bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
 
@@ -812,192 +784,160 @@ def finalize_booking(call):
     bot.answer_callback_query(call.id)
     if call.data == "booking:cancel":
         reset_flow(chat_id)
-        bot.edit_message_text("❌ Запись отменена.", chat_id, call.message.message_id)
-        bot.send_message(chat_id, "Главное меню:", reply_markup=get_main_keyboard())
+        bot.edit_message_text("â ÐÐ°Ð¿Ð¸ÑÑ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°.", chat_id, call.message.message_id)
+        bot.send_message(chat_id, "ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ:", reply_markup=get_main_keyboard())
         return
 
     data = get_state(chat_id)
     required = {"name", "phone", "date", "time", "service", "problem"}
     if not required.issubset(data):
         reset_flow(chat_id)
-        bot.send_message(chat_id, "⚠️ Сессия устарела. Начните запись заново.", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "â ï¸ Ð¡ÐµÑÑÐ¸Ñ ÑÑÑÐ°ÑÐµÐ»Ð°. ÐÐ°ÑÐ½Ð¸ÑÐµ Ð·Ð°Ð¿Ð¸ÑÑ Ð·Ð°Ð½Ð¾Ð²Ð¾.", reply_markup=get_main_keyboard())
         return
 
     try:
         dt = appointment_dt_from_state(data)
     except (KeyError, ValueError):
         reset_flow(chat_id)
-        bot.send_message(chat_id, "⚠️ Некорректная дата/время. Начните запись заново.", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "â ï¸ ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð°Ñ Ð´Ð°ÑÐ°/Ð²ÑÐµÐ¼Ñ. ÐÐ°ÑÐ½Ð¸ÑÐµ Ð·Ð°Ð¿Ð¸ÑÑ Ð·Ð°Ð½Ð¾Ð²Ð¾.", reply_markup=get_main_keyboard())
         return
 
     if dt <= now_local():
         reset_flow(chat_id)
-        bot.send_message(chat_id, "⚠️ Это время уже прошло. Выберите новую дату.", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "â ï¸ Ð­ÑÐ¾ Ð²ÑÐµÐ¼Ñ ÑÐ¶Ðµ Ð¿ÑÐ¾ÑÐ»Ð¾. ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð½Ð¾Ð²ÑÑ Ð´Ð°ÑÑ.", reply_markup=get_main_keyboard())
         return
 
     app_id, result = create_appointment(data, chat_id, call.from_user.username)
     if result == "taken":
         bot.edit_message_text(
-            "⚠️ Это время только что занял другой пациент.\nПожалуйста, начните запись заново и выберите другое время.",
+            "â ï¸ Ð­ÑÐ¾ Ð²ÑÐµÐ¼Ñ ÑÐ¾Ð»ÑÐºÐ¾ ÑÑÐ¾ Ð·Ð°Ð½ÑÐ» Ð´ÑÑÐ³Ð¾Ð¹ Ð¿Ð°ÑÐ¸ÐµÐ½Ñ.\nÐÐ¾Ð¶Ð°Ð»ÑÐ¹ÑÑÐ°, Ð½Ð°ÑÐ½Ð¸ÑÐµ Ð·Ð°Ð¿Ð¸ÑÑ Ð·Ð°Ð½Ð¾Ð²Ð¾ Ð¸ Ð²ÑÐ±ÐµÑÐ¸ÑÐµ Ð´ÑÑÐ³Ð¾Ðµ Ð²ÑÐµÐ¼Ñ.",
             chat_id, call.message.message_id,
         )
         reset_flow(chat_id)
-        bot.send_message(chat_id, "Выберите действие:", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´ÐµÐ¹ÑÑÐ²Ð¸Ðµ:", reply_markup=get_main_keyboard())
         return
     if result == "limit":
         bot.edit_message_text(
-            f"⚠️ Нельзя иметь больше {MAX_ACTIVE_APPOINTMENTS_PER_USER} активных записей одновременно.",
+            f"â ï¸ ÐÐµÐ»ÑÐ·Ñ Ð¸Ð¼ÐµÑÑ Ð±Ð¾Ð»ÑÑÐµ {MAX_ACTIVE_APPOINTMENTS_PER_USER} Ð°ÐºÑÐ¸Ð²Ð½ÑÑ Ð·Ð°Ð¿Ð¸ÑÐµÐ¹ Ð¾Ð´Ð½Ð¾Ð²ÑÐµÐ¼ÐµÐ½Ð½Ð¾.",
             chat_id, call.message.message_id,
         )
         reset_flow(chat_id)
-        bot.send_message(chat_id, "Вы можете посмотреть текущие записи в «📋 Мои записи».", reply_markup=get_main_keyboard())
-        return
-    if result == "invalid":
-        bot.edit_message_text(
-            "⚠️ Это время больше недоступно. Начните запись заново и выберите свободную дату и время.",
-            chat_id, call.message.message_id,
-        )
-        reset_flow(chat_id)
-        bot.send_message(chat_id, "Главное меню:", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "ÐÑ Ð¼Ð¾Ð¶ÐµÑÐµ Ð¿Ð¾ÑÐ¼Ð¾ÑÑÐµÑÑ ÑÐµÐºÑÑÐ¸Ðµ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð² Â«ð ÐÐ¾Ð¸ Ð·Ð°Ð¿Ð¸ÑÐ¸Â».", reply_markup=get_main_keyboard())
         return
     if result != "ok":
-        logger.error("Ошибка записи на приём №%s", data)
+        logger.error("Appointment %s failed", data)
         reset_flow(chat_id)
-        bot.edit_message_text("❌ Не удалось сохранить запись. Попробуйте ещё раз.", chat_id, call.message.message_id)
-        bot.send_message(chat_id, "Главное меню:", reply_markup=get_main_keyboard())
+        bot.edit_message_text("â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ ÑÐ¾ÑÑÐ°Ð½Ð¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ. ÐÐ¾Ð¿ÑÐ¾Ð±ÑÐ¹ÑÐµ ÐµÑÑ ÑÐ°Ð·.", chat_id, call.message.message_id)
+        bot.send_message(chat_id, "ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ:", reply_markup=get_main_keyboard())
         return
 
     bot.edit_message_text(
-        f"✅ <b>Вы успешно записаны!</b>\n\n"
-        f"👤 {safe_text(data['name'])}\n"
-        f"📅 {dt:%d.%m.%Y}\n"
-        f"⏰ {dt:%H:%M}\n"
-        f"🦷 {safe_text(data['service'])}\n\n"
-        "Мы ждём вас!",
+        f"â <b>ÐÑ ÑÑÐ¿ÐµÑÐ½Ð¾ Ð·Ð°Ð¿Ð¸ÑÐ°Ð½Ñ!</b>\n\n"
+        f"ð¤ {safe_text(data['name'])}\n"
+        f"ð {dt:%d.%m.%Y}\n"
+        f"â° {dt:%H:%M}\n"
+        f"ð¦· {safe_text(data['service'])}\n\n"
+        "ÐÑ Ð¶Ð´ÑÐ¼ Ð²Ð°Ñ!",
         chat_id, call.message.message_id, parse_mode="HTML",
     )
 
     username = call.from_user.username
-    user_link = f"@{safe_text(username)}" if username else "Не указан"
+    user_link = f"@{safe_text(username)}" if username else "ÐÐµ ÑÐºÐ°Ð·Ð°Ð½"
     doctor_msg = (
-        f"🆕 <b>НОВАЯ ЗАПИСЬ №{app_id}!</b>\n\n"
-        f"👤 Пациент: {safe_text(data['name'])}\n"
-        f"📞 Телефон: {safe_text(data['phone'])}\n"
-        f"💬 Telegram: {user_link}\n"
-        f"⏰ Время: {dt:%d.%m.%Y %H:%M}\n"
-        f"🦷 Услуга: {safe_text(data['service'])}\n"
-        f"🩺 Жалоба: {safe_text(data['problem'])}"
+        f"ð <b>ÐÐÐÐÐ¯ ÐÐÐÐÐ¡Ð¬ â{app_id}!</b>\n\n"
+        f"ð¤ ÐÐ°ÑÐ¸ÐµÐ½Ñ: {safe_text(data['name'])}\n"
+        f"ð Ð¢ÐµÐ»ÐµÑÐ¾Ð½: {safe_text(data['phone'])}\n"
+        f"ð¬ Telegram: {user_link}\n"
+        f"â° ÐÑÐµÐ¼Ñ: {dt:%d.%m.%Y %H:%M}\n"
+        f"ð¦· Ð£ÑÐ»ÑÐ³Ð°: {safe_text(data['service'])}\n"
+        f"ð©º ÐÐ°Ð»Ð¾Ð±Ð°: {safe_text(data['problem'])}"
     )
     markup = types.InlineKeyboardMarkup()
     if username:
-        markup.add(types.InlineKeyboardButton("💬 Написать клиенту", url=f"https://t.me/{username}"))
-    markup.add(types.InlineKeyboardButton("❌ Отменить запись", callback_data=f"dcancel:{app_id}"))
+        markup.add(types.InlineKeyboardButton("ð¬ ÐÐ°Ð¿Ð¸ÑÐ°ÑÑ ÐºÐ»Ð¸ÐµÐ½ÑÑ", url=f"https://t.me/{username}"))
+    markup.add(types.InlineKeyboardButton("â ÐÑÐ¼ÐµÐ½Ð¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ", callback_data=f"dcancel:{app_id}"))
 
     try:
         bot.send_message(DOCTOR_CHAT_ID, doctor_msg, reply_markup=markup, parse_mode="HTML")
     except Exception:
         # The appointment is already safely stored; doctor dashboard can still find it.
-        logger.exception("Не удалось уведомить врача о записи №%s", app_id)
+        logger.exception("Failed to notify doctor about appointment %s", app_id)
         bot.send_message(
             chat_id,
-            "ℹ️ Запись сохранена в системе. Уведомление врачу временно не доставлено.",
+            "â¹ï¸ ÐÐ°Ð¿Ð¸ÑÑ ÑÐ¾ÑÑÐ°Ð½ÐµÐ½Ð° Ð² ÑÐ¸ÑÑÐµÐ¼Ðµ. Ð£Ð²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ðµ Ð²ÑÐ°ÑÑ Ð²ÑÐµÐ¼ÐµÐ½Ð½Ð¾ Ð½Ðµ Ð´Ð¾ÑÑÐ°Ð²Ð»ÐµÐ½Ð¾.",
         )
 
     reset_flow(chat_id)
-    bot.send_message(chat_id, "Главное меню:", reply_markup=get_main_keyboard())
+    bot.send_message(chat_id, "ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ:", reply_markup=get_main_keyboard())
 
 
 # ============================================================
 # Client appointments
 # ============================================================
 
-def get_user_appointments(user_id, include_history=False):
-    """Load a user's appointments safely."""
-    conn = None
-    cur = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        if include_history:
-            cur.execute("""
-                SELECT id, appointment_at, service, status
-                FROM appointments
-                WHERE user_id=%s AND appointment_at IS NOT NULL
-                ORDER BY appointment_at DESC LIMIT 20
-            """, (user_id,))
-        else:
-            cur.execute("""
-                SELECT id, appointment_at, service, status
-                FROM appointments
-                WHERE user_id=%s AND status='active'
-                  AND appointment_at IS NOT NULL AND appointment_at > NOW()
-                ORDER BY appointment_at ASC
-            """, (user_id,))
-        return cur.fetchall()
-    except Exception:
-        logger.exception("Не удалось загрузить записи пациента")
-        return []
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
 def show_my_appointments(message):
     records = get_user_appointments(message.chat.id, include_history=False)
     history_markup = types.InlineKeyboardMarkup()
-    history_markup.add(types.InlineKeyboardButton("📜 История записей", callback_data="history:show"))
+    history_markup.add(types.InlineKeyboardButton("ð ÐÑÑÐ¾ÑÐ¸Ñ Ð·Ð°Ð¿Ð¸ÑÐµÐ¹", callback_data="history:show"))
 
     if not records:
         bot.send_message(
             message.chat.id,
-            "У вас нет будущих активных записей.",
+            "Ð£ Ð²Ð°Ñ Ð½ÐµÑ Ð±ÑÐ´ÑÑÐ¸Ñ Ð°ÐºÑÐ¸Ð²Ð½ÑÑ Ð·Ð°Ð¿Ð¸ÑÐµÐ¹.",
             reply_markup=history_markup,
         )
-        bot.send_message(message.chat.id, "Главное меню:", reply_markup=get_main_keyboard())
+        bot.send_message(message.chat.id, "ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ:", reply_markup=get_main_keyboard())
         return
 
-    bot.send_message(message.chat.id, "📋 <b>Ваши активные записи:</b>", parse_mode="HTML", reply_markup=history_markup)
+    bot.send_message(message.chat.id, "ð <b>ÐÐ°ÑÐ¸ Ð°ÐºÑÐ¸Ð²Ð½ÑÐµ Ð·Ð°Ð¿Ð¸ÑÐ¸:</b>", parse_mode="HTML", reply_markup=history_markup)
     for row in records:
         dt = row["appointment_at"].astimezone(TZ)
         text = (
-            f"🗓 <b>{dt:%d.%m.%Y %H:%M}</b>\n"
-            f"🦷 {safe_text(row['service'])}\n"
-            f"👨‍⚕️ Доктор Маруф"
+            f"ð <b>{dt:%d.%m.%Y %H:%M}</b>\n"
+            f"ð¦· {safe_text(row['service'])}\n"
+            f"ð¨ââï¸ ÐÐ¾ÐºÑÐ¾Ñ ÐÐ°ÑÑÑ"
         )
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("❌ Отменить запись", callback_data=f"ucancel:{row['id']}"))
+        markup.add(types.InlineKeyboardButton("â ÐÑÐ¼ÐµÐ½Ð¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÑ", callback_data=f"ucancel:{row['id']}"))
         bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "history:show")
 def show_history_callback(call):
     chat_id = call.message.chat.id
-    conn = get_db_connection()
-    cur = conn.cursor()
+    conn = None
+    cur = None
     try:
+        conn = get_db_connection()
+        cur = conn.cursor()
         cur.execute("""
             SELECT id, appointment_at, service, status
             FROM appointments
-            WHERE user_id=%s AND appointment_at IS NOT NULL
+            WHERE user_id=%s
             ORDER BY appointment_at DESC
             LIMIT 20
         """, (chat_id,))
         records = cur.fetchall()
+    except Exception:
+        logger.exception("ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð³ÑÑÐ·Ð¸ÑÑ Ð¸ÑÑÐ¾ÑÐ¸Ñ Ð·Ð°Ð¿Ð¸ÑÐµÐ¹")
+        bot.answer_callback_query(call.id, "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð³ÑÑÐ·Ð¸ÑÑ Ð¸ÑÑÐ¾ÑÐ¸Ñ.", show_alert=True)
+        return
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
     bot.answer_callback_query(call.id)
     if not records:
-        bot.send_message(chat_id, "📜 История пока пустая.")
+        bot.send_message(chat_id, "ð ÐÑÑÐ¾ÑÐ¸Ñ Ð¿Ð¾ÐºÐ° Ð¿ÑÑÑÐ°Ñ.")
         return
-    lines = ["📜 <b>История записей</b>\n"]
-    status_labels = {"active": "🟢 активна", "completed": "✅ пришёл", "noshow": "❌ не пришёл", "cancelled": "🚫 отменена"}
+    lines = ["ð <b>ÐÑÑÐ¾ÑÐ¸Ñ Ð·Ð°Ð¿Ð¸ÑÐµÐ¹</b>\n"]
+    status_labels = {"active": "ð¢ Ð°ÐºÑÐ¸Ð²Ð½Ð°", "completed": "â Ð¿ÑÐ¸ÑÑÐ»", "noshow": "â Ð½Ðµ Ð¿ÑÐ¸ÑÑÐ»", "cancelled": "ð« Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°"}
     for row in records:
         dt = row["appointment_at"].astimezone(TZ)
         lines.append(
-            f"№{row['id']} — {dt:%d.%m.%Y %H:%M} — {safe_text(row['service'])} — "
+            f"â{row['id']} â {dt:%d.%m.%Y %H:%M} â {safe_text(row['service'])} â "
             f"{status_labels.get(row['status'], row['status'])}"
         )
     bot.send_message(chat_id, "\n".join(lines), parse_mode="HTML")
@@ -1009,7 +949,7 @@ def handle_user_cancel(call):
     try:
         app_id = int(call.data.split(":", 1)[1])
     except ValueError:
-        bot.answer_callback_query(call.id, "Некорректная запись.")
+        bot.answer_callback_query(call.id, "ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð°Ñ Ð·Ð°Ð¿Ð¸ÑÑ.")
         return
 
     conn = get_db_connection()
@@ -1023,14 +963,14 @@ def handle_user_cancel(call):
         row = cur.fetchone()
         if not row:
             conn.rollback()
-            bot.answer_callback_query(call.id, "Запись уже отменена или завершена.")
-            bot.edit_message_text("ℹ️ Запись уже недоступна для отмены.", chat_id, call.message.message_id)
+            bot.answer_callback_query(call.id, "ÐÐ°Ð¿Ð¸ÑÑ ÑÐ¶Ðµ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð° Ð¸Ð»Ð¸ Ð·Ð°Ð²ÐµÑÑÐµÐ½Ð°.")
+            bot.edit_message_text("â¹ï¸ ÐÐ°Ð¿Ð¸ÑÑ ÑÐ¶Ðµ Ð½ÐµÐ´Ð¾ÑÑÑÐ¿Ð½Ð° Ð´Ð»Ñ Ð¾ÑÐ¼ÐµÐ½Ñ.", chat_id, call.message.message_id)
             return
 
         appointment_at = row["appointment_at"].astimezone(TZ)
         if appointment_at - now_local() < timedelta(minutes=CANCEL_MINUTES_BEFORE):
             conn.rollback()
-            bot.answer_callback_query(call.id, "Слишком поздно для отмены онлайн.", show_alert=True)
+            bot.answer_callback_query(call.id, "Ð¡Ð»Ð¸ÑÐºÐ¾Ð¼ Ð¿Ð¾Ð·Ð´Ð½Ð¾ Ð´Ð»Ñ Ð¾ÑÐ¼ÐµÐ½Ñ Ð¾Ð½Ð»Ð°Ð¹Ð½.", show_alert=True)
             return
 
         cur.execute("""
@@ -1041,23 +981,23 @@ def handle_user_cancel(call):
         conn.commit()
     except Exception:
         conn.rollback()
-        logger.exception("Ошибка отмены записи пациентом")
-        bot.answer_callback_query(call.id, "Ошибка. Попробуйте позже.", show_alert=True)
+        logger.exception("Client cancellation failed")
+        bot.answer_callback_query(call.id, "ÐÑÐ¸Ð±ÐºÐ°. ÐÐ¾Ð¿ÑÐ¾Ð±ÑÐ¹ÑÐµ Ð¿Ð¾Ð·Ð¶Ðµ.", show_alert=True)
         return
     finally:
         cur.close()
         conn.close()
 
-    bot.answer_callback_query(call.id, "Запись отменена.")
-    bot.edit_message_text("❌ Запись отменена.", chat_id, call.message.message_id)
+    bot.answer_callback_query(call.id, "ÐÐ°Ð¿Ð¸ÑÑ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°.")
+    bot.edit_message_text("â ÐÐ°Ð¿Ð¸ÑÑ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°.", chat_id, call.message.message_id)
     try:
         bot.send_message(
             DOCTOR_CHAT_ID,
-            f"⚠️ <b>Пациент отменил запись №{app_id}.</b>\n🗓 Время: {format_dt(appointment_at)}\n🟢 Слот снова свободен.",
+            f"â ï¸ <b>ÐÐ°ÑÐ¸ÐµÐ½Ñ Ð¾ÑÐ¼ÐµÐ½Ð¸Ð» Ð·Ð°Ð¿Ð¸ÑÑ â{app_id}.</b>\nð ÐÑÐµÐ¼Ñ: {format_dt(appointment_at)}\nð¢ Ð¡Ð»Ð¾Ñ ÑÐ½Ð¾Ð²Ð° ÑÐ²Ð¾Ð±Ð¾Ð´ÐµÐ½.",
             parse_mode="HTML",
         )
     except Exception:
-        logger.exception("Не удалось уведомить врача об отмене записи")
+        logger.exception("Failed to notify doctor about client cancellation")
 
 
 # ============================================================
@@ -1066,7 +1006,7 @@ def handle_user_cancel(call):
 
 def rating_keyboard(prefix="rate:"):
     markup = types.InlineKeyboardMarkup()
-    buttons = [types.InlineKeyboardButton(f"⭐ {i}", callback_data=f"{prefix}{i}") for i in range(1, 6)]
+    buttons = [types.InlineKeyboardButton(f"â­ {i}", callback_data=f"{prefix}{i}") for i in range(1, 6)]
     markup.row(buttons[0], buttons[1], buttons[2])
     markup.row(buttons[3], buttons[4])
     return markup
@@ -1076,7 +1016,7 @@ def ask_rating(message):
     reset_flow(message.chat.id)
     bot.send_message(
         message.chat.id,
-        "Пожалуйста, оцените качество лечения и обслуживания от 1 до 5:",
+        "ÐÐ¾Ð¶Ð°Ð»ÑÐ¹ÑÑÐ°, Ð¾ÑÐµÐ½Ð¸ÑÐµ ÐºÐ°ÑÐµÑÑÐ²Ð¾ Ð»ÐµÑÐµÐ½Ð¸Ñ Ð¸ Ð¾Ð±ÑÐ»ÑÐ¶Ð¸Ð²Ð°Ð½Ð¸Ñ Ð¾Ñ 1 Ð´Ð¾ 5:",
         reply_markup=rating_keyboard(),
     )
 
@@ -1086,22 +1026,22 @@ def process_rating_stars(call):
     try:
         stars = int(call.data.split(":", 1)[1])
     except ValueError:
-        bot.answer_callback_query(call.id, "Неверная оценка.")
+        bot.answer_callback_query(call.id, "ÐÐµÐ²ÐµÑÐ½Ð°Ñ Ð¾ÑÐµÐ½ÐºÐ°.")
         return
     if not 1 <= stars <= 5:
-        bot.answer_callback_query(call.id, "Неверная оценка.")
+        bot.answer_callback_query(call.id, "ÐÐµÐ²ÐµÑÐ½Ð°Ñ Ð¾ÑÐµÐ½ÐºÐ°.")
         return
 
     chat_id = call.message.chat.id
     set_state(chat_id, flow="review", rating_val=stars, awaiting_comment=True)
     bot.answer_callback_query(call.id)
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("⏩ Пропустить", callback_data="review:skip"))
+    markup.add(types.InlineKeyboardButton("â© ÐÑÐ¾Ð¿ÑÑÑÐ¸ÑÑ", callback_data="review:skip"))
     bot.edit_message_text(
-        f"Оценка принята: {'⭐' * stars}\n\nНапишите короткий отзыв или пропустите.",
+        f"ÐÑÐµÐ½ÐºÐ° Ð¿ÑÐ¸Ð½ÑÑÐ°: {'â­' * stars}\n\nÐÐ°Ð¿Ð¸ÑÐ¸ÑÐµ ÐºÐ¾ÑÐ¾ÑÐºÐ¸Ð¹ Ð¾ÑÐ·ÑÐ² Ð¸Ð»Ð¸ Ð¿ÑÐ¾Ð¿ÑÑÑÐ¸ÑÐµ.",
         chat_id, call.message.message_id, reply_markup=markup,
     )
-    msg = bot.send_message(chat_id, "Ваш комментарий:", reply_markup=back_keyboard())
+    msg = bot.send_message(chat_id, "ÐÐ°Ñ ÐºÐ¾Ð¼Ð¼ÐµÐ½ÑÐ°ÑÐ¸Ð¹:", reply_markup=back_keyboard())
     bot.register_next_step_handler(msg, save_comment_step)
 
 
@@ -1113,7 +1053,7 @@ def skip_comment_callback(call):
 
 def save_comment_step(message):
     chat_id = message.chat.id
-    if message.text == "⬅️ Отмена":
+    if message.text == "â¬ï¸ ÐÑÐ¼ÐµÐ½Ð°":
         cancel_button(message)
         return
     data = get_state(chat_id)
@@ -1121,7 +1061,7 @@ def save_comment_step(message):
         return
     comment = (message.text or "").strip()
     if len(comment) > MAX_REVIEW_LEN:
-        msg = bot.send_message(chat_id, f"⚠️ Отзыв слишком длинный. Максимум {MAX_REVIEW_LEN} символов.", reply_markup=back_keyboard())
+        msg = bot.send_message(chat_id, f"â ï¸ ÐÑÐ·ÑÐ² ÑÐ»Ð¸ÑÐºÐ¾Ð¼ Ð´Ð»Ð¸Ð½Ð½ÑÐ¹. ÐÐ°ÐºÑÐ¸Ð¼ÑÐ¼ {MAX_REVIEW_LEN} ÑÐ¸Ð¼Ð²Ð¾Ð»Ð¾Ð².", reply_markup=back_keyboard())
         bot.register_next_step_handler(msg, save_comment_step)
         return
     save_review(chat_id, comment)
@@ -1134,14 +1074,14 @@ def save_review(chat_id, comment, edit_message_id=None):
     cur = conn.cursor()
     try:
         cur.execute(
-            "INSERT INTO reviews (user_id, rating, comment, created_at_ts) VALUES (%s,%s,%s,NOW())",
-            (chat_id, rating, comment),
+            "INSERT INTO reviews (user_id, rating, comment, created_at) VALUES (%s,%s,%s,%s)",
+            (chat_id, rating, comment, now_local().strftime("%Y-%m-%d %H:%M:%S%z")),
         )
         conn.commit()
     except Exception:
         conn.rollback()
-        logger.exception("Не удалось сохранить отзыв")
-        bot.send_message(chat_id, "❌ Не удалось сохранить отзыв. Попробуйте позже.", reply_markup=get_main_keyboard())
+        logger.exception("Review save failed")
+        bot.send_message(chat_id, "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ ÑÐ¾ÑÑÐ°Ð½Ð¸ÑÑ Ð¾ÑÐ·ÑÐ². ÐÐ¾Ð¿ÑÐ¾Ð±ÑÐ¹ÑÐµ Ð¿Ð¾Ð·Ð¶Ðµ.", reply_markup=get_main_keyboard())
         return
     finally:
         cur.close()
@@ -1151,31 +1091,31 @@ def save_review(chat_id, comment, edit_message_id=None):
     try:
         chat = bot.get_chat(chat_id)
         username = chat.username
-        first_name = chat.first_name or "Пациент"
+        first_name = chat.first_name or "ÐÐ°ÑÐ¸ÐµÐ½Ñ"
     except Exception:
-        first_name = "Пациент"
+        first_name = "ÐÐ°ÑÐ¸ÐµÐ½Ñ"
 
     clear_state(chat_id)
     cancel_steps(chat_id)
     if edit_message_id:
         try:
-            bot.edit_message_text("Спасибо за отзыв! ❤️", chat_id, edit_message_id)
+            bot.edit_message_text("Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾ÑÐ·ÑÐ²! â¤ï¸", chat_id, edit_message_id)
         except Exception:
-            bot.send_message(chat_id, "Спасибо за отзыв! ❤️", reply_markup=get_main_keyboard())
+            bot.send_message(chat_id, "Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾ÑÐ·ÑÐ²! â¤ï¸", reply_markup=get_main_keyboard())
     else:
-        bot.send_message(chat_id, "Спасибо за отзыв! ❤️", reply_markup=get_main_keyboard())
+        bot.send_message(chat_id, "Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾ÑÐ·ÑÐ²! â¤ï¸", reply_markup=get_main_keyboard())
 
     try:
         bot.send_message(
             DOCTOR_CHAT_ID,
-            f"🌟 <b>Новый отзыв</b>\n\n"
-            f"👤 {safe_text(first_name)}\n"
-            f"⭐ Оценка: {'⭐' * rating}\n"
-            f"💬 {safe_text(comment) if comment else 'Без комментария'}",
+            f"ð <b>ÐÐ¾Ð²ÑÐ¹ Ð¾ÑÐ·ÑÐ²</b>\n\n"
+            f"ð¤ {safe_text(first_name)}\n"
+            f"â­ ÐÑÐµÐ½ÐºÐ°: {'â­' * rating}\n"
+            f"ð¬ {safe_text(comment) if comment else 'ÐÐµÐ· ÐºÐ¾Ð¼Ð¼ÐµÐ½ÑÐ°ÑÐ¸Ñ'}",
             parse_mode="HTML",
         )
     except Exception:
-        logger.exception("Не удалось отправить отзыв врачу")
+        logger.exception("Failed to notify doctor about review")
 
 
 # ============================================================
@@ -1187,11 +1127,11 @@ def doctor_panel_menu(message):
         return
     markup = types.InlineKeyboardMarkup()
     markup.row(
-        types.InlineKeyboardButton("📅 Сегодня", callback_data="period:today"),
-        types.InlineKeyboardButton("📆 Завтра", callback_data="period:tomorrow"),
+        types.InlineKeyboardButton("ð Ð¡ÐµÐ³Ð¾Ð´Ð½Ñ", callback_data="period:today"),
+        types.InlineKeyboardButton("ð ÐÐ°Ð²ÑÑÐ°", callback_data="period:tomorrow"),
     )
-    markup.row(types.InlineKeyboardButton("📊 7 дней", callback_data="period:week"))
-    bot.send_message(message.chat.id, "👨‍⚕️ <b>Панель врача</b>", parse_mode="HTML", reply_markup=markup)
+    markup.row(types.InlineKeyboardButton("ð 7 Ð´Ð½ÐµÐ¹", callback_data="period:week"))
+    bot.send_message(message.chat.id, "ð¨ââï¸ <b>ÐÐ°Ð½ÐµÐ»Ñ Ð²ÑÐ°ÑÐ°</b>", parse_mode="HTML", reply_markup=markup)
 
 
 def period_bounds(period):
@@ -1199,15 +1139,15 @@ def period_bounds(period):
     if period == "today":
         start_date = today
         end_date = today + timedelta(days=1)
-        title = f"📅 Записи на сегодня ({today:%d.%m.%Y})"
+        title = f"ð ÐÐ°Ð¿Ð¸ÑÐ¸ Ð½Ð° ÑÐµÐ³Ð¾Ð´Ð½Ñ ({today:%d.%m.%Y})"
     elif period == "tomorrow":
         start_date = today + timedelta(days=1)
         end_date = today + timedelta(days=2)
-        title = f"📆 Записи на завтра ({start_date:%d.%m.%Y})"
+        title = f"ð ÐÐ°Ð¿Ð¸ÑÐ¸ Ð½Ð° Ð·Ð°Ð²ÑÑÐ° ({start_date:%d.%m.%Y})"
     else:
         start_date = today
         end_date = today + timedelta(days=7)
-        title = "📊 Активные записи на ближайшие 7 дней"
+        title = "ð ÐÐºÑÐ¸Ð²Ð½ÑÐµ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð½Ð° Ð±Ð»Ð¸Ð¶Ð°Ð¹ÑÐ¸Ðµ 7 Ð´Ð½ÐµÐ¹"
     start = datetime.combine(start_date, time.min).replace(tzinfo=TZ)
     end = datetime.combine(end_date, time.min).replace(tzinfo=TZ)
     return start, end, title
@@ -1220,27 +1160,34 @@ def show_doctor_period(call):
         return
     period = call.data.split(":", 1)[1]
     if period not in {"today", "tomorrow", "week"}:
-        bot.answer_callback_query(call.id, "Неверный период.")
+        bot.answer_callback_query(call.id, "ÐÐµÐ²ÐµÑÐ½ÑÐ¹ Ð¿ÐµÑÐ¸Ð¾Ð´.")
         return
     start, end, title = period_bounds(period)
-    conn = get_db_connection()
-    cur = conn.cursor()
+    conn = None
+    cur = None
     try:
+        conn = get_db_connection()
+        cur = conn.cursor()
         cur.execute("""
             SELECT id, patient_name, phone_number, username, service, problem, appointment_at
             FROM appointments
-            WHERE status='active' AND appointment_at IS NOT NULL
-              AND appointment_at >= %s AND appointment_at < %s
+            WHERE status='active' AND appointment_at >= %s AND appointment_at < %s
             ORDER BY appointment_at ASC
         """, (start, end))
         records = cur.fetchall()
+    except Exception:
+        logger.exception("ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð³ÑÑÐ·Ð¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð´Ð»Ñ Ð¿Ð°Ð½ÐµÐ»Ð¸ Ð²ÑÐ°ÑÐ°")
+        bot.answer_callback_query(call.id, "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð³ÑÑÐ·Ð¸ÑÑ Ð·Ð°Ð¿Ð¸ÑÐ¸.", show_alert=True)
+        return
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
     bot.answer_callback_query(call.id)
     if not records:
-        bot.edit_message_text(f"{title}\n\n📭 Активных записей нет.", call.message.chat.id, call.message.message_id)
+        bot.edit_message_text(f"{title}\n\nð­ ÐÐºÑÐ¸Ð²Ð½ÑÑ Ð·Ð°Ð¿Ð¸ÑÐµÐ¹ Ð½ÐµÑ.", call.message.chat.id, call.message.message_id)
         return
 
     try:
@@ -1252,20 +1199,20 @@ def show_doctor_period(call):
     for row in records:
         dt = row["appointment_at"].astimezone(TZ)
         card = (
-            f"🆔 <b>Запись №{row['id']}</b>\n"
-            f"👤 {safe_text(row['patient_name'])}\n"
-            f"📞 {safe_text(row['phone_number'])}\n"
-            f"💬 Telegram: {safe_text('@' + row['username']) if row['username'] else 'не указан'}\n"
-            f"⏰ {dt:%d.%m.%Y %H:%M}\n"
-            f"🦷 {safe_text(row['service'])}\n"
-            f"💬 {safe_text(row['problem'])}"
+            f"ð <b>ÐÐ°Ð¿Ð¸ÑÑ â{row['id']}</b>\n"
+            f"ð¤ {safe_text(row['patient_name'])}\n"
+            f"ð {safe_text(row['phone_number'])}\n"
+            f"ð¬ Telegram: {safe_text('@' + row['username']) if row['username'] else 'Ð½Ðµ ÑÐºÐ°Ð·Ð°Ð½'}\n"
+            f"â° {dt:%d.%m.%Y %H:%M}\n"
+            f"ð¦· {safe_text(row['service'])}\n"
+            f"ð¬ {safe_text(row['problem'])}"
         )
         markup = types.InlineKeyboardMarkup()
         markup.row(
-            types.InlineKeyboardButton("✅ Пришёл", callback_data=f"status:completed:{row['id']}"),
-            types.InlineKeyboardButton("❌ Не пришёл", callback_data=f"status:noshow:{row['id']}"),
+            types.InlineKeyboardButton("â ÐÑÐ¸ÑÑÐ»", callback_data=f"status:completed:{row['id']}"),
+            types.InlineKeyboardButton("â ÐÐµ Ð¿ÑÐ¸ÑÑÐ»", callback_data=f"status:noshow:{row['id']}"),
         )
-        markup.add(types.InlineKeyboardButton("🚫 Отменить", callback_data=f"dcancel:{row['id']}"))
+        markup.add(types.InlineKeyboardButton("ð« ÐÑÐ¼ÐµÐ½Ð¸ÑÑ", callback_data=f"dcancel:{row['id']}"))
         bot.send_message(call.message.chat.id, card, parse_mode="HTML", reply_markup=markup)
 
 
@@ -1276,26 +1223,24 @@ def handle_status_change(call):
         return
     parts = call.data.split(":")
     if len(parts) != 3 or parts[1] not in {"completed", "noshow"}:
-        bot.answer_callback_query(call.id, "Некорректный статус.")
+        bot.answer_callback_query(call.id, "ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½ÑÐ¹ ÑÑÐ°ÑÑÑ.")
         return
     status = parts[1]
     try:
         app_id = int(parts[2])
     except ValueError:
-        bot.answer_callback_query(call.id, "Некорректная запись.")
+        bot.answer_callback_query(call.id, "ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð°Ñ Ð·Ð°Ð¿Ð¸ÑÑ.")
         return
 
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Нельзя отметить будущую запись как «пришёл» или «не пришёл».
-        # Проверка выполняется в БД в рамках той же транзакции, чтобы
-        # статус нельзя было изменить заранее даже при прямом callback.
         cur.execute("""
             UPDATE appointments
             SET status=%s, status_updated_at=NOW()
             WHERE id=%s
               AND status='active'
+              AND appointment_at IS NOT NULL
               AND appointment_at <= NOW()
             RETURNING user_id, patient_name, appointment_at
         """, (status, app_id))
@@ -1309,32 +1254,38 @@ def handle_status_change(call):
             existing = cur.fetchone()
             conn.rollback()
             if not existing:
-                bot.answer_callback_query(call.id, "Запись не найдена.", show_alert=True)
+                bot.answer_callback_query(call.id, "ÐÐ°Ð¿Ð¸ÑÑ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°.", show_alert=True)
                 return
-            if existing[0] != "active":
-                bot.answer_callback_query(call.id, "Статус уже изменён.")
-                bot.edit_message_text(f"Запись №{app_id}\n\nℹ️ Статус уже был изменён.", call.message.chat.id, call.message.message_id)
+            if existing["status"] != "active":
+                bot.answer_callback_query(call.id, "Ð¡ÑÐ°ÑÑÑ ÑÐ¶Ðµ Ð¸Ð·Ð¼ÐµÐ½ÑÐ½.")
+                bot.edit_message_text(
+                    f"ÐÐ°Ð¿Ð¸ÑÑ â{app_id}\n\nâ¹ï¸ Ð¡ÑÐ°ÑÑÑ ÑÐ¶Ðµ Ð±ÑÐ» Ð¸Ð·Ð¼ÐµÐ½ÑÐ½.",
+                    call.message.chat.id, call.message.message_id
+                )
+                return
+            if existing["appointment_at"] is None:
+                bot.answer_callback_query(call.id, "Ð£ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð½ÐµÑ Ð´Ð°ÑÑ Ð¿ÑÐ¸ÑÐ¼Ð°.", show_alert=True)
                 return
             bot.answer_callback_query(
                 call.id,
-                "Время приёма ещё не наступило. Отметить визит можно после времени записи.",
+                "ÐÑÐµÐ¼Ñ Ð¿ÑÐ¸ÑÐ¼Ð° ÐµÑÑ Ð½Ðµ Ð½Ð°ÑÑÑÐ¿Ð¸Ð»Ð¾. ÐÑÐ¼ÐµÑÐ¸ÑÑ Ð²Ð¸Ð·Ð¸Ñ Ð¼Ð¾Ð¶Ð½Ð¾ Ð¿Ð¾ÑÐ»Ðµ Ð²ÑÐµÐ¼ÐµÐ½Ð¸ Ð·Ð°Ð¿Ð¸ÑÐ¸.",
                 show_alert=True,
             )
             return
         conn.commit()
     except Exception:
         conn.rollback()
-        logger.exception("Ошибка изменения статуса записи")
-        bot.answer_callback_query(call.id, "Ошибка базы данных.", show_alert=True)
+        logger.exception("Status update failed")
+        bot.answer_callback_query(call.id, "ÐÑÐ¸Ð±ÐºÐ° Ð±Ð°Ð·Ñ Ð´Ð°Ð½Ð½ÑÑ.", show_alert=True)
         return
     finally:
         cur.close()
         conn.close()
 
-    label = "пришёл" if status == "completed" else "не пришёл"
-    bot.answer_callback_query(call.id, "Статус обновлён")
+    label = "Ð¿ÑÐ¸ÑÑÐ»" if status == "completed" else "Ð½Ðµ Ð¿ÑÐ¸ÑÑÐ»"
+    bot.answer_callback_query(call.id, "Ð¡ÑÐ°ÑÑÑ Ð¾Ð±Ð½Ð¾Ð²Ð»ÑÐ½")
     bot.edit_message_text(
-        f"🆔 Запись №{app_id}\n\n<b>Статус: {label}</b>",
+        f"ð ÐÐ°Ð¿Ð¸ÑÑ â{app_id}\n\n<b>Ð¡ÑÐ°ÑÑÑ: {label}</b>",
         call.message.chat.id, call.message.message_id, parse_mode="HTML",
     )
 
@@ -1342,12 +1293,12 @@ def handle_status_change(call):
         try:
             bot.send_message(
                 row["user_id"],
-                f"Здравствуйте, {safe_text(row['patient_name'])}! Спасибо за визит.\n\nОцените качество лечения:",
+                f"ÐÐ´ÑÐ°Ð²ÑÑÐ²ÑÐ¹ÑÐµ, {safe_text(row['patient_name'])}! Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð²Ð¸Ð·Ð¸Ñ.\n\nÐÑÐµÐ½Ð¸ÑÐµ ÐºÐ°ÑÐµÑÑÐ²Ð¾ Ð»ÐµÑÐµÐ½Ð¸Ñ:",
                 parse_mode="HTML",
                 reply_markup=rating_keyboard("rate:"),
             )
         except Exception:
-            logger.exception("Не удалось отправить запрос на отзыв после приёма")
+            logger.exception("Failed to send post-visit review request")
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("dcancel:"))
@@ -1358,7 +1309,7 @@ def handle_doctor_cancel(call):
     try:
         app_id = int(call.data.split(":", 1)[1])
     except ValueError:
-        bot.answer_callback_query(call.id, "Некорректная запись.")
+        bot.answer_callback_query(call.id, "ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð°Ñ Ð·Ð°Ð¿Ð¸ÑÑ.")
         return
 
     conn = get_db_connection()
@@ -1373,28 +1324,28 @@ def handle_doctor_cancel(call):
         row = cur.fetchone()
         if not row:
             conn.rollback()
-            bot.answer_callback_query(call.id, "Запись уже не активна.")
+            bot.answer_callback_query(call.id, "ÐÐ°Ð¿Ð¸ÑÑ ÑÐ¶Ðµ Ð½Ðµ Ð°ÐºÑÐ¸Ð²Ð½Ð°.")
             return
         conn.commit()
     except Exception:
         conn.rollback()
-        logger.exception("Ошибка отмены записи врачом")
-        bot.answer_callback_query(call.id, "Ошибка базы данных.", show_alert=True)
+        logger.exception("Doctor cancellation failed")
+        bot.answer_callback_query(call.id, "ÐÑÐ¸Ð±ÐºÐ° Ð±Ð°Ð·Ñ Ð´Ð°Ð½Ð½ÑÑ.", show_alert=True)
         return
     finally:
         cur.close()
         conn.close()
 
-    bot.answer_callback_query(call.id, "Запись отменена")
-    bot.edit_message_text(f"❌ Запись №{app_id} отменена врачом.", call.message.chat.id, call.message.message_id)
+    bot.answer_callback_query(call.id, "ÐÐ°Ð¿Ð¸ÑÑ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°")
+    bot.edit_message_text(f"â ÐÐ°Ð¿Ð¸ÑÑ â{app_id} Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð° Ð²ÑÐ°ÑÐ¾Ð¼.", call.message.chat.id, call.message.message_id)
     try:
         bot.send_message(
             row["user_id"],
-            f"⚠️ Ваша запись на {format_dt(row['appointment_at'])} отменена клиникой.\n"
-            "Пожалуйста, выберите новое время или свяжитесь с клиникой.",
+            f"â ï¸ ÐÐ°ÑÐ° Ð·Ð°Ð¿Ð¸ÑÑ Ð½Ð° {format_dt(row['appointment_at'])} Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð° ÐºÐ»Ð¸Ð½Ð¸ÐºÐ¾Ð¹.\n"
+            "ÐÐ¾Ð¶Ð°Ð»ÑÐ¹ÑÑÐ°, Ð²ÑÐ±ÐµÑÐ¸ÑÐµ Ð½Ð¾Ð²Ð¾Ðµ Ð²ÑÐµÐ¼Ñ Ð¸Ð»Ð¸ ÑÐ²ÑÐ¶Ð¸ÑÐµÑÑ Ñ ÐºÐ»Ð¸Ð½Ð¸ÐºÐ¾Ð¹.",
         )
     except Exception:
-        logger.exception("Не удалось уведомить пациента об отмене записи")
+        logger.exception("Failed to notify patient about doctor cancellation")
 
 
 # ============================================================
@@ -1439,9 +1390,9 @@ def show_statistics(message):
             conn.close()
 
         service_text = "\n".join(
-            f"• {safe_text(row['service'])}: <b>{row['cnt']}</b>"
+            f"â¢ {safe_text(row['service'])}: <b>{row['cnt']}</b>"
             for row in top_services
-        ) or "• Пока нет данных"
+        ) or "â¢ ÐÐ¾ÐºÐ° Ð½ÐµÑ Ð´Ð°Ð½Ð½ÑÑ"
 
         upcoming = []
         for i in range(3):
@@ -1456,26 +1407,26 @@ def show_statistics(message):
             finally:
                 cur.close()
                 conn.close()
-            label = "Сегодня" if i == 0 else "Завтра" if i == 1 else d.strftime("%d.%m")
-            upcoming.append(f"• {label}: <b>{cnt}</b>")
+            label = "Ð¡ÐµÐ³Ð¾Ð´Ð½Ñ" if i == 0 else "ÐÐ°Ð²ÑÑÐ°" if i == 1 else d.strftime("%d.%m")
+            upcoming.append(f"â¢ {label}: <b>{cnt}</b>")
 
         stats = (
-            "📊 <b>СТАТИСТИКА КЛИНИКИ</b>\n\n"
-            f"👥 Уникальных пациентов: <b>{total_patients}</b>\n"
-            f"📆 Записей в текущем месяце: <b>{month_appointments}</b>\n\n"
-            f"<b>Статусы:</b>\n"
-            f"✅ Пришли: <b>{completed}</b>\n"
-            f"❌ Не пришли: <b>{noshow}</b>\n"
-            f"🚫 Отменено: <b>{cancelled}</b>\n"
-            f"📈 Процент явок: <b>{attendance}%</b>\n\n"
-            f"⭐ Средняя оценка: <b>{avg_rating}/5</b> ({total_reviews} отзывов)\n\n"
-            f"🦷 <b>Топ услуг:</b>\n{service_text}\n\n"
-            f"📅 <b>Ближайшие дни:</b>\n" + "\n".join(upcoming)
+            "ð <b>Ð¡Ð¢ÐÐ¢ÐÐ¡Ð¢ÐÐÐ ÐÐÐÐÐÐÐ</b>\n\n"
+            f"ð¥ Ð£Ð½Ð¸ÐºÐ°Ð»ÑÐ½ÑÑ Ð¿Ð°ÑÐ¸ÐµÐ½ÑÐ¾Ð²: <b>{total_patients}</b>\n"
+            f"ð ÐÐ°Ð¿Ð¸ÑÐµÐ¹ Ð² ÑÐµÐºÑÑÐµÐ¼ Ð¼ÐµÑÑÑÐµ: <b>{month_appointments}</b>\n\n"
+            f"<b>Ð¡ÑÐ°ÑÑÑÑ:</b>\n"
+            f"â ÐÑÐ¸ÑÐ»Ð¸: <b>{completed}</b>\n"
+            f"â ÐÐµ Ð¿ÑÐ¸ÑÐ»Ð¸: <b>{noshow}</b>\n"
+            f"ð« ÐÑÐ¼ÐµÐ½ÐµÐ½Ð¾: <b>{cancelled}</b>\n"
+            f"ð ÐÑÐ¾ÑÐµÐ½Ñ ÑÐ²Ð¾Ðº: <b>{attendance}%</b>\n\n"
+            f"â­ Ð¡ÑÐµÐ´Ð½ÑÑ Ð¾ÑÐµÐ½ÐºÐ°: <b>{avg_rating}/5</b> ({total_reviews} Ð¾ÑÐ·ÑÐ²Ð¾Ð²)\n\n"
+            f"ð¦· <b>Ð¢Ð¾Ð¿ ÑÑÐ»ÑÐ³:</b>\n{service_text}\n\n"
+            f"ð <b>ÐÐ»Ð¸Ð¶Ð°Ð¹ÑÐ¸Ðµ Ð´Ð½Ð¸:</b>\n" + "\n".join(upcoming)
         )
         bot.send_message(message.chat.id, stats, parse_mode="HTML")
     except Exception:
-        logger.exception("Не удалось получить статистику")
-        bot.send_message(message.chat.id, "❌ Не удалось получить статистику. Попробуйте позже.")
+        logger.exception("Statistics failed")
+        bot.send_message(message.chat.id, "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¿Ð¾Ð»ÑÑÐ¸ÑÑ ÑÑÐ°ÑÐ¸ÑÑÐ¸ÐºÑ. ÐÐ¾Ð¿ÑÐ¾Ð±ÑÐ¹ÑÐµ Ð¿Ð¾Ð·Ð¶Ðµ.")
 
 
 # ============================================================
@@ -1500,8 +1451,25 @@ def claim_reminder(app_id, column):
         return row
     except Exception:
         conn.rollback()
-        logger.exception("Не удалось получить напоминание для отправки")
+        logger.exception("Failed to claim reminder")
         return None
+    finally:
+        cur.close()
+        conn.close()
+
+
+def reset_reminder_claim(app_id, column):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"UPDATE appointments SET {column}=FALSE WHERE id=%s AND status='active'",
+            (app_id,),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logger.exception("ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð²ÐµÑÐ½ÑÑÑ ÑÐ»Ð°Ð³ Ð½Ð°Ð¿Ð¾Ð¼Ð¸Ð½Ð°Ð½Ð¸Ñ Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ â%s", app_id)
     finally:
         cur.close()
         conn.close()
@@ -1516,7 +1484,6 @@ def check_and_send_reminders():
             SELECT id, user_id, patient_name, appointment_at, reminded_24h, reminded_2h
             FROM appointments
             WHERE status='active'
-              AND appointment_at IS NOT NULL
               AND appointment_at > NOW()
               AND appointment_at <= NOW() + INTERVAL '25 hours'
             ORDER BY appointment_at
@@ -1524,7 +1491,7 @@ def check_and_send_reminders():
         records = cur.fetchall()
     except Exception:
         conn.rollback()
-        logger.exception("Ошибка при поиске напоминаний")
+        logger.exception("Reminder query failed")
         return
     finally:
         cur.close()
@@ -1537,42 +1504,58 @@ def check_and_send_reminders():
         diff = app_dt - now
 
         # 24h window: 23h45m .. 24h15m; scheduler runs every 5 min.
-        if timedelta(hours=2) < diff <= timedelta(hours=24) and not row["reminded_24h"]:
+        if timedelta(hours=23, minutes=45) <= diff <= timedelta(hours=24, minutes=15) and not row["reminded_24h"]:
             claimed = claim_reminder(app_id, "reminded_24h")
             if claimed:
+                patient_sent = False
                 try:
                     bot.send_message(
                         claimed["user_id"],
-                        f"🦷 Напоминание: завтра у вас визит в {app_dt:%H:%M}.\n"
-                        f"📅 {app_dt:%d.%m.%Y}\n📍 {CLINIC_NAME}",
+                        f"ð¦· ÐÐ°Ð¿Ð¾Ð¼Ð¸Ð½Ð°Ð½Ð¸Ðµ: Ð·Ð°Ð²ÑÑÐ° Ñ Ð²Ð°Ñ Ð²Ð¸Ð·Ð¸Ñ Ð² {app_dt:%H:%M}.\n"
+                        f"ð {app_dt:%d.%m.%Y}\nð {CLINIC_NAME}",
                     )
-                    bot.send_message(
-                        DOCTOR_CHAT_ID,
-                        f"🔔 <b>Напоминание врачу</b>\nЗапись №{app_id}: {app_dt:%d.%m.%Y %H:%M}\n"
-                        f"Пациент: {safe_text(patient_name)}",
-                        parse_mode="HTML",
-                    )
+                    patient_sent = True
                 except Exception:
-                    logger.exception("Не удалось отправить напоминание за 24 часа для записи №%s", app_id)
+                    logger.exception("ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾ÑÐ¿ÑÐ°Ð²Ð¸ÑÑ Ð¿Ð°ÑÐ¸ÐµÐ½ÑÑ Ð½Ð°Ð¿Ð¾Ð¼Ð¸Ð½Ð°Ð½Ð¸Ðµ Ð·Ð° 24 ÑÐ°ÑÐ° Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ â%s", app_id)
+                    reset_reminder_claim(app_id, "reminded_24h")
+
+                if patient_sent:
+                    try:
+                        bot.send_message(
+                            DOCTOR_CHAT_ID,
+                            f"ð <b>ÐÐ°Ð¿Ð¾Ð¼Ð¸Ð½Ð°Ð½Ð¸Ðµ Ð²ÑÐ°ÑÑ</b>\nÐÐ°Ð¿Ð¸ÑÑ â{app_id}: {app_dt:%d.%m.%Y %H:%M}\n"
+                            f"ÐÐ°ÑÐ¸ÐµÐ½Ñ: {safe_text(patient_name)}",
+                            parse_mode="HTML",
+                        )
+                    except Exception:
+                        logger.exception("ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾ÑÐ¿ÑÐ°Ð²Ð¸ÑÑ Ð²ÑÐ°ÑÑ Ð½Ð°Ð¿Ð¾Ð¼Ð¸Ð½Ð°Ð½Ð¸Ðµ Ð·Ð° 24 ÑÐ°ÑÐ° Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ â%s", app_id)
 
         # 2h window: 1h45m .. 2h15m.
-        if timedelta(0) < diff <= timedelta(hours=2) and not row["reminded_2h"]:
+        if timedelta(hours=1, minutes=45) <= diff <= timedelta(hours=2, minutes=15) and not row["reminded_2h"]:
             claimed = claim_reminder(app_id, "reminded_2h")
             if claimed:
+                patient_sent = False
                 try:
                     bot.send_message(
                         claimed["user_id"],
-                        f"⏰ Напоминание: сегодня визит в {app_dt:%H:%M}.\n"
-                        f"📍 {CLINIC_NAME}\n{CLINIC_ADDRESS}",
+                        f"â° ÐÐ°Ð¿Ð¾Ð¼Ð¸Ð½Ð°Ð½Ð¸Ðµ: ÑÐµÐ³Ð¾Ð´Ð½Ñ Ð²Ð¸Ð·Ð¸Ñ Ð² {app_dt:%H:%M}.\n"
+                        f"ð {CLINIC_NAME}\n{CLINIC_ADDRESS}",
                     )
-                    bot.send_message(
-                        DOCTOR_CHAT_ID,
-                        f"⏰ <b>Через 2 часа запись №{app_id}</b>\n"
-                        f"Время: {app_dt:%H:%M}\nПациент: {safe_text(patient_name)}",
-                        parse_mode="HTML",
-                    )
+                    patient_sent = True
                 except Exception:
-                    logger.exception("Не удалось отправить напоминание за 2 часа для записи №%s", app_id)
+                    logger.exception("ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾ÑÐ¿ÑÐ°Ð²Ð¸ÑÑ Ð¿Ð°ÑÐ¸ÐµÐ½ÑÑ Ð½Ð°Ð¿Ð¾Ð¼Ð¸Ð½Ð°Ð½Ð¸Ðµ Ð·Ð° 2 ÑÐ°ÑÐ° Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ â%s", app_id)
+                    reset_reminder_claim(app_id, "reminded_2h")
+
+                if patient_sent:
+                    try:
+                        bot.send_message(
+                            DOCTOR_CHAT_ID,
+                            f"â° <b>Ð§ÐµÑÐµÐ· 2 ÑÐ°ÑÐ° Ð·Ð°Ð¿Ð¸ÑÑ â{app_id}</b>\n"
+                            f"ÐÑÐµÐ¼Ñ: {app_dt:%H:%M}\nÐÐ°ÑÐ¸ÐµÐ½Ñ: {safe_text(patient_name)}",
+                            parse_mode="HTML",
+                        )
+                    except Exception:
+                        logger.exception("ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾ÑÐ¿ÑÐ°Ð²Ð¸ÑÑ Ð²ÑÐ°ÑÑ Ð½Ð°Ð¿Ð¾Ð¼Ð¸Ð½Ð°Ð½Ð¸Ðµ Ð·Ð° 2 ÑÐ°ÑÐ° Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ â%s", app_id)
 
 
 # ============================================================
@@ -1582,9 +1565,9 @@ def check_and_send_reminders():
 @bot.message_handler(func=lambda m: bool(m.text) and not m.text.startswith("/"))
 def fallback_handler(message):
     if is_doctor(message.chat.id):
-        bot.send_message(message.chat.id, "Используйте кнопки панели врача.", reply_markup=get_doctor_keyboard())
+        bot.send_message(message.chat.id, "ÐÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ ÐºÐ½Ð¾Ð¿ÐºÐ¸ Ð¿Ð°Ð½ÐµÐ»Ð¸ Ð²ÑÐ°ÑÐ°.", reply_markup=get_doctor_keyboard())
     else:
-        bot.send_message(message.chat.id, "Не понял команду. Выберите действие в меню.", reply_markup=get_main_keyboard())
+        bot.send_message(message.chat.id, "ÐÐµ Ð¿Ð¾Ð½ÑÐ» ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ. ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´ÐµÐ¹ÑÑÐ²Ð¸Ðµ Ð² Ð¼ÐµÐ½Ñ.", reply_markup=get_main_keyboard())
 
 
 # ============================================================
@@ -1607,7 +1590,7 @@ if __name__ == "__main__":
     )
     scheduler.start()
 
-    logger.info("Stoma dent bot started | version=%s", BOT_VERSION)
+    logger.info("Stoma dent bot started")
     try:
         bot.infinity_polling(
             skip_pending=True,
