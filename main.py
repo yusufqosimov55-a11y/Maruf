@@ -187,7 +187,7 @@ def send_location(message):
         "📍 Наша клиника Stoma dent находится по адресу:\n"
         "г. Ташкент, Яшнабадский район, 1-й квартал Авиасозлар, 12"
     )
-    bot.send_location(chat_id, latitude=41.295246, longitude=69.355014)
+    bot.send_location(chat_id, latitude=41.2892286, longitude=69.3549142)
 
 # --- ПРОЦЕСС ЗАПИСИ ---
 def start_booking_button(message):
