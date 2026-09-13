@@ -887,10 +887,6 @@ bot.send_message(chat_id, "Главное меню:", reply_markup=...)
     
 username = call.from_user.username
 
-bot.send_message(chat_id, "Главное меню:", reply_markup=...)
-    
-username = call.from_user.username
-
     username = call.from_user.username
     user_link = f"@{safe_text(username)}" if username else "Не указан"
     doctor_msg = (
