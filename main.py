@@ -625,7 +625,7 @@ def choose_date(call):
     except ValueError:
         bot.answer_callback_query(call.id, "Неверная дата.")
         return
-    if selected not in next_open_dates(BOOKING_DAYS + 2):
+    if selected not in next_open_dates(BOOKING_DAYS):
         bot.answer_callback_query(call.id, "Эта дата больше недоступна.")
         return
     set_state(call.message.chat.id, date=value)
