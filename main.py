@@ -883,12 +883,6 @@ def finalize_booking(call):
     chat_id, call.message.message_id, parse_mode="HTML"
 )
 
-bot.send_message(chat_id, "Главное меню:", reply_markup=...)
-    
-username = call.from_user.username
-user_link = f"@{safe_text(username)}" if username else "Не указан"
-   
-doctor_msg = (
     
         f"🆕 <b>НОВАЯ ЗАПИСЬ №{app_id}!</b>\n\n"
         f"👤 Пациент: {safe_text(data['name'])}\n"
