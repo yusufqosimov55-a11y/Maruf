@@ -92,7 +92,6 @@ MONTHS_RU = [
     "июля", "августа", "сентября", "октября", "ноября", "декабря",
 ]
 
-
 # ============================================================
 # Basic helpers
 # ============================================================
@@ -100,14 +99,11 @@ MONTHS_RU = [
 def now_local():
     return datetime.now(TZ)
 
-
 def safe_text(value, default=""):
     return html.escape(str(value if value is not None else default))
 
-
 def format_dt(dt):
     return dt.astimezone(TZ).strftime("%d.%m.%Y %H:%M")
-
 
 def get_db_connection():
     conn = psycopg2.connect(
@@ -118,21 +114,17 @@ def get_db_connection():
     conn.autocommit = False
     return conn
 
-
 def set_state(chat_id, **values):
     with state_lock:
         user_data.setdefault(chat_id, {}).update(values)
-
 
 def get_state(chat_id):
     with state_lock:
         return dict(user_data.get(chat_id, {}))
 
-
 def clear_state(chat_id):
     with state_lock:
         user_data.pop(chat_id, None)
-
 
 def cancel_steps(chat_id):
     try:
@@ -140,15 +132,12 @@ def cancel_steps(chat_id):
     except Exception:
         logger.exception("Не удалось очистить обработчик шага")
 
-
 def reset_flow(chat_id):
     cancel_steps(chat_id)
     clear_state(chat_id)
 
-
 def is_doctor(chat_id):
     return chat_id == DOCTOR_CHAT_ID
-
 
 def normalize_phone(raw):
     if not raw:
@@ -170,17 +159,14 @@ def normalize_phone(raw):
         return None
     return phone
 
-
 def valid_name(text):
     text = " ".join((text or "").split())
     if len(text) < 3 or len(text) > MAX_NAME_LEN:
         return False
     return bool(re.fullmatch(r"[A-Za-zА-Яа-яЁёЎўҚқҒғҲҳІіЪъЬь\- ']+", text))
 
-
 def valid_problem(text):
     return bool(text and len(text.strip()) <= MAX_PROBLEM_LEN)
-
 
 def appointment_dt_from_state(data):
     naive = datetime.strptime(
@@ -188,10 +174,8 @@ def appointment_dt_from_state(data):
     )
     return naive.replace(tzinfo=TZ)
 
-
 def send_main_menu(chat_id, text):
     bot.send_message(chat_id, text, reply_markup=get_main_keyboard())
-
 
 # ============================================================
 # Flask health endpoint
@@ -201,20 +185,16 @@ def send_main_menu(chat_id, text):
 def home():
     return "Telegram-бот Stoma dent работает!", 200
 
-
 @app.route("/health")
 def health():
     return {"status": "ok"}, 200
-
 
 def run_flask():
     port = int(os.getenv("PORT", "10000"))
     app.run(host="0.0.0.0", port=port, use_reloader=False)
 
-
 def keep_alive():
     Thread(target=run_flask, daemon=True).start()
-
 
 # ============================================================
 # Database initialization + migration
@@ -326,7 +306,6 @@ def init_db():
         cur.close()
         conn.close()
 
-
 def create_appointment(data, user_id, username):
     try:
         appointment_at = appointment_dt_from_state(data)
@@ -387,7 +366,6 @@ def create_appointment(data, user_id, username):
         cur.close()
         conn.close()
 
-
 # ============================================================
 # Keyboards
 # ============================================================
@@ -399,19 +377,16 @@ def get_main_keyboard():
     markup.row("⭐ Оценить лечение / Отзыв", "ℹ️ Информация")
     return markup
 
-
 def get_doctor_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
     markup.row("📋 Панель врача", "📊 Статистика")
     markup.row("📱 Главное меню клиента")
     return markup
 
-
 def back_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     markup.row("⬅️ Отмена")
     return markup
-
 
 # ============================================================
 # Start / navigation
@@ -434,20 +409,17 @@ def start_cmd(message):
             reply_markup=get_main_keyboard(),
         )
 
-
 @bot.message_handler(commands=["cancel"])
 def cancel_command(message):
     reset_flow(message.chat.id)
     keyboard = get_doctor_keyboard() if is_doctor(message.chat.id) else get_main_keyboard()
     bot.send_message(message.chat.id, "❌ Текущая операция отменена.", reply_markup=keyboard)
 
-
 @bot.message_handler(func=lambda m: m.text == "⬅️ Отмена")
 def cancel_button(message):
     reset_flow(message.chat.id)
     keyboard = get_doctor_keyboard() if is_doctor(message.chat.id) else get_main_keyboard()
     bot.send_message(message.chat.id, "❌ Отменено.", reply_markup=keyboard)
-
 
 @bot.message_handler(func=lambda m: m.text in {
     "📅 Записаться на приём", "📋 Мои записи", "🩺 Услуги и лечение",
@@ -476,10 +448,8 @@ def menu_router(message):
     elif text == "📱 Главное меню клиента":
         show_client_menu(message)
 
-
 def show_client_menu(message):
     send_main_menu(message.chat.id, "Переключено на меню клиента.")
-
 
 def services_info(message):
     text = (
@@ -490,7 +460,6 @@ def services_info(message):
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=get_main_keyboard())
 
-
 def clinic_info(message):
     text = (
         f"👨‍⚕️ <b>{safe_text(CLINIC_NAME)}</b>\n\n"
@@ -500,7 +469,6 @@ def clinic_info(message):
         f"📞 <b>Телефон:</b> {safe_text(CLINIC_PHONE)}"
     )
     bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=get_main_keyboard())
-
 
 def send_location(message):
     chat_id = message.chat.id
@@ -522,7 +490,6 @@ def send_location(message):
             f"Можно найти клинику по названию «{safe_text(CLINIC_NAME)}» и адресу выше.",
             reply_markup=get_main_keyboard(),
         )
-
 
 # ============================================================
 # Booking flow
@@ -548,7 +515,6 @@ def start_booking(message):
         reply_markup=markup,
     )
 
-
 def show_service_selection(chat_id, message_id=None):
     markup = types.InlineKeyboardMarkup()
     items = list(SERVICES.items())
@@ -568,7 +534,6 @@ def show_service_selection(chat_id, message_id=None):
             pass
     bot.send_message(chat_id, text, reply_markup=markup)
 
-
 @bot.callback_query_handler(func=lambda call: call.data in {"consent:yes", "consent:no"})
 def booking_consent(call):
     chat_id = call.message.chat.id
@@ -579,7 +544,6 @@ def booking_consent(call):
         bot.send_message(chat_id, "Главное меню:", reply_markup=get_main_keyboard())
         return
     show_service_selection(chat_id, call.message.message_id)
-
 
 def next_open_dates():
     result = []
@@ -596,7 +560,6 @@ def next_open_dates():
 
     return result
 
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("srv:"))
 def process_service_choice(call):
     key = call.data.split(":", 1)[1]
@@ -606,7 +569,6 @@ def process_service_choice(call):
     set_state(call.message.chat.id, flow="booking", service=SERVICES[key])
     bot.answer_callback_query(call.id)
     show_date_selection(call.message.chat.id, call.message.message_id)
-
 
 def show_date_selection(chat_id, message_id=None):
     markup = types.InlineKeyboardMarkup()
@@ -622,7 +584,6 @@ def show_date_selection(chat_id, message_id=None):
             pass
     bot.send_message(chat_id, text, reply_markup=markup)
 
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("date:"))
 def choose_date(call):
     value = call.data.split(":", 1)[1]
@@ -637,7 +598,6 @@ def choose_date(call):
     set_state(call.message.chat.id, date=value)
     bot.answer_callback_query(call.id)
     show_time_selection(call.message.chat.id, call.message.message_id, selected)
-
 
 def show_time_selection(chat_id, message_id, date_obj):
     start = datetime.combine(date_obj, time.min).replace(tzinfo=TZ)
@@ -691,12 +651,10 @@ def show_time_selection(chat_id, message_id, date_obj):
         chat_id, message_id, reply_markup=markup, parse_mode="HTML",
     )
 
-
 @bot.callback_query_handler(func=lambda call: call.data == "back:dates")
 def back_dates(call):
     bot.answer_callback_query(call.id)
     show_date_selection(call.message.chat.id, call.message.message_id)
-
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("time:"))
 def choose_time(call):
@@ -724,7 +682,6 @@ def choose_time(call):
     )
     bot.register_next_step_handler(msg, process_name)
 
-
 def process_name(message):
     chat_id = message.chat.id
     if message.text == "⬅️ Отмена":
@@ -745,7 +702,6 @@ def process_name(message):
     markup.row("⬅️ Отмена")
     msg = bot.send_message(chat_id, "📞 Отправьте номер телефона или введите его вручную.", reply_markup=markup)
     bot.register_next_step_handler(msg, process_phone)
-
 
 def process_phone(message):
     chat_id = message.chat.id
@@ -769,7 +725,6 @@ def process_phone(message):
         reply_markup=back_keyboard(),
     )
     bot.register_next_step_handler(msg, process_problem)
-
 
 def process_problem(message):
     chat_id = message.chat.id
@@ -810,7 +765,6 @@ def process_problem(message):
         types.InlineKeyboardButton("❌ Отменить", callback_data="booking:cancel"),
     )
     bot.send_message(chat_id, text, parse_mode="HTML", reply_markup=markup)
-
 
 @bot.callback_query_handler(func=lambda call: call.data in {"booking:confirm", "booking:cancel"})
 def finalize_booking(call):
@@ -874,16 +828,18 @@ def finalize_booking(call):
         return
 
     bot.edit_message_text(
-    f"✅ <b>Вы успешно записаны!</b>\n\n"
-    f"👤 {safe_text(data['name'])}\n"
-    f"📅 {dt:%d.%m.%Y}\n"
-    f"⏰ {dt:%H:%M}\n"
-    f"🦷 {safe_text(data['service'])}\n\n"
-    "Мы ждём вас!",
-    chat_id, call.message.message_id, parse_mode="HTML"
-)
+        f"✅ <b>Вы успешно записаны!</b>\n\n"
+        f"👤 {safe_text(data['name'])}\n"
+        f"📅 {dt:%d.%m.%Y}\n"
+        f"⏰ {dt:%H:%M}\n"
+        f"🦷 {safe_text(data['service'])}\n\n"
+        "Мы ждём вас!",
+        chat_id, call.message.message_id, parse_mode="HTML",
+    )
 
-    
+    username = call.from_user.username
+    user_link = f"@{safe_text(username)}" if username else "Не указан"
+    doctor_msg = (
         f"🆕 <b>НОВАЯ ЗАПИСЬ №{app_id}!</b>\n\n"
         f"👤 Пациент: {safe_text(data['name'])}\n"
         f"📞 Телефон: {safe_text(data['phone'])}\n"
@@ -909,7 +865,6 @@ def finalize_booking(call):
 
     reset_flow(chat_id)
     bot.send_message(chat_id, "Главное меню:", reply_markup=get_main_keyboard())
-
 
 # ============================================================
 # Client appointments
@@ -973,7 +928,6 @@ def show_my_appointments(message):
         markup.add(types.InlineKeyboardButton("❌ Отменить запись", callback_data=f"ucancel:{row['id']}"))
         bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=markup)
 
-
 @bot.callback_query_handler(func=lambda call: call.data == "history:show")
 def show_history_callback(call):
     chat_id = call.message.chat.id
@@ -1005,7 +959,6 @@ def show_history_callback(call):
             f"{status_labels.get(row['status'], row['status'])}"
         )
     bot.send_message(chat_id, "\n".join(lines), parse_mode="HTML")
-
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("ucancel:"))
 def handle_user_cancel(call):
@@ -1063,7 +1016,6 @@ def handle_user_cancel(call):
     except Exception:
         logger.exception("Не удалось уведомить врача об отмене записи")
 
-
 # ============================================================
 # Reviews
 # ============================================================
@@ -1075,7 +1027,6 @@ def rating_keyboard(prefix="rate:"):
     markup.row(buttons[3], buttons[4])
     return markup
 
-
 def ask_rating(message):
     reset_flow(message.chat.id)
     bot.send_message(
@@ -1083,7 +1034,6 @@ def ask_rating(message):
         "Пожалуйста, оцените качество лечения и обслуживания от 1 до 5:",
         reply_markup=rating_keyboard(),
     )
-
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("rate:"))
 def process_rating_stars(call):
@@ -1108,12 +1058,10 @@ def process_rating_stars(call):
     msg = bot.send_message(chat_id, "Ваш комментарий:", reply_markup=back_keyboard())
     bot.register_next_step_handler(msg, save_comment_step)
 
-
 @bot.callback_query_handler(func=lambda call: call.data == "review:skip")
 def skip_comment_callback(call):
     save_review(call.message.chat.id, "", call.message.message_id)
     bot.answer_callback_query(call.id)
-
 
 def save_comment_step(message):
     chat_id = message.chat.id
@@ -1129,7 +1077,6 @@ def save_comment_step(message):
         bot.register_next_step_handler(msg, save_comment_step)
         return
     save_review(chat_id, comment)
-
 
 def save_review(chat_id, comment, edit_message_id=None):
     data = get_state(chat_id)
@@ -1181,7 +1128,6 @@ def save_review(chat_id, comment, edit_message_id=None):
     except Exception:
         logger.exception("Не удалось отправить отзыв врачу")
 
-
 # ============================================================
 # Doctor panel
 # ============================================================
@@ -1196,7 +1142,6 @@ def doctor_panel_menu(message):
     )
     markup.row(types.InlineKeyboardButton("📊 7 дней", callback_data="period:week"))
     bot.send_message(message.chat.id, "👨‍⚕️ <b>Панель врача</b>", parse_mode="HTML", reply_markup=markup)
-
 
 def period_bounds(period):
     today = now_local().date()
@@ -1215,7 +1160,6 @@ def period_bounds(period):
     start = datetime.combine(start_date, time.min).replace(tzinfo=TZ)
     end = datetime.combine(end_date, time.min).replace(tzinfo=TZ)
     return start, end, title
-
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("period:"))
 def show_doctor_period(call):
@@ -1271,7 +1215,6 @@ def show_doctor_period(call):
         )
         markup.add(types.InlineKeyboardButton("🚫 Отменить", callback_data=f"dcancel:{row['id']}"))
         bot.send_message(call.message.chat.id, card, parse_mode="HTML", reply_markup=markup)
-
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("status:"))
 def handle_status_change(call):
@@ -1353,7 +1296,6 @@ def handle_status_change(call):
         except Exception:
             logger.exception("Не удалось отправить запрос на отзыв после приёма")
 
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("dcancel:"))
 def handle_doctor_cancel(call):
     if not is_doctor(call.message.chat.id):
@@ -1399,7 +1341,6 @@ def handle_doctor_cancel(call):
         )
     except Exception:
         logger.exception("Не удалось уведомить пациента об отмене записи")
-
 
 # ============================================================
 # Statistics
@@ -1481,7 +1422,6 @@ def show_statistics(message):
         logger.exception("Не удалось получить статистику")
         bot.send_message(message.chat.id, "❌ Не удалось получить статистику. Попробуйте позже.")
 
-
 # ============================================================
 # Reminders: 24h + 2h
 # ============================================================
@@ -1509,7 +1449,6 @@ def claim_reminder(app_id, column):
     finally:
         cur.close()
         conn.close()
-
 
 def check_and_send_reminders():
     now = now_local()
@@ -1578,7 +1517,6 @@ def check_and_send_reminders():
                 except Exception:
                     logger.exception("Не удалось отправить напоминание за 2 часа для записи №%s", app_id)
 
-
 # ============================================================
 # Error handler
 # ============================================================
@@ -1589,7 +1527,6 @@ def fallback_handler(message):
         bot.send_message(message.chat.id, "Используйте кнопки панели врача.", reply_markup=get_doctor_keyboard())
     else:
         bot.send_message(message.chat.id, "Не понял команду. Выберите действие в меню.", reply_markup=get_main_keyboard())
-
 
 # ============================================================
 # Run
@@ -1620,5 +1557,3 @@ if __name__ == "__main__":
         )
     finally:
         scheduler.shutdown(wait=False)
-
-
