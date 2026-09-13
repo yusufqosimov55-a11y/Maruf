@@ -52,7 +52,7 @@ CLINIC_LON = os.getenv("CLINIC_LON")
 
 OPEN_WEEKDAYS = {
     int(x.strip())
-    for x in os.getenv("OPEN_WEEKDAYS", "0,1,2,3,4,5,6").split(",")
+    for x in os.getenv("OPEN_WEEKDAYS", "0,1,2,3,4,5").split(",")
     if x.strip().isdigit() and 0 <= int(x.strip()) <= 6
 }
 BOOKING_DAYS = int(os.getenv("BOOKING_DAYS", "5"))
