@@ -581,13 +581,15 @@ def booking_consent(call):
     show_service_selection(chat_id, call.message.message_id)
 
 
-def next_open_dates(count=BOOKING_DAYS):
+def next_open_dates():
     result = []
     current = now_local().date()
-    while len(result) < count:
-        current += timedelta(days=1)
+
+    for _ in range(7):
         if current.weekday() in OPEN_WEEKDAYS:
             result.append(current)
+        current += timedelta(days=1)
+
     return result
 
 
