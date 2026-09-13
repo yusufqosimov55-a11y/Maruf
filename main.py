@@ -874,14 +874,22 @@ def finalize_booking(call):
         return
 
     bot.edit_message_text(
-        f"✅ <b>Вы успешно записаны!</b>\n\n"
-        f"👤 {safe_text(data['name'])}\n"
-        f"📅 {dt:%d.%m.%Y}\n"
-        f"⏰ {dt:%H:%M}\n"
-        f"🦷 {safe_text(data['service'])}\n\n"
-        "Мы ждём вас!",
-        chat_id, call.message.message_id, parse_mode="HTML",
-    )
+    f"✅ <b>Вы успешно записаны!</b>\n\n"
+    f"👤 {safe_text(data['name'])}\n"
+    f"📅 {dt:%d.%m.%Y}\n"
+    f"⏰ {dt:%H:%M}\n"
+    f"🦷 {safe_text(data['service'])}\n\n"
+    "Мы ждём вас!",
+    chat_id, call.message.message_id, parse_mode="HTML"
+)
+
+bot.send_message(chat_id, "Главное меню:", reply_markup=...)
+    
+username = call.from_user.username
+
+bot.send_message(chat_id, "Главное меню:", reply_markup=...)
+    
+username = call.from_user.username
 
     username = call.from_user.username
     user_link = f"@{safe_text(username)}" if username else "Не указан"
