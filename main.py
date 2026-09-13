@@ -583,7 +583,11 @@ def booking_consent(call):
 
 def next_open_dates():
     result = []
-    current = now_local().date()
+    now = now_local()
+    current = now.date()
+
+    if now.time() >= time(19, 0):
+        current += timedelta(days=1)
 
     for _ in range(7):
         if current.weekday() in OPEN_WEEKDAYS:
